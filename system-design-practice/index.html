@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design Practice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #111111;
+    --bg3: #181818;
+    --bg4: #1f1f1f;
+    --border: #2a2a2a;
+    --border2: #333;
+    --text: #e8e8e8;
+    --text2: #999;
+    --text3: #666;
+    --accent: #e8ff00;
+    --accent2: #00ffc8;
+    --accent3: #ff6b35;
+    --accent4: #a78bfa;
+    --accent5: #38bdf8;
+    --green: #4ade80;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 48px 32px 40px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  header p {
+    color: var(--text2);
+    font-size: 15px;
+    max-width: 600px;
+  }
+
+  .topics {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .topic-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px 28px;
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color 0.2s, background 0.2s;
+    display: block;
+  }
+
+  .topic-card:hover {
+    border-color: var(--accent);
+    background: var(--bg3);
+  }
+
+  .topic-card .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent2);
+    margin-bottom: 8px;
+  }
+
+  .topic-card h2 {
+    font-family: var(--sans);
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .topic-card p {
+    color: var(--text2);
+    font-size: 13px;
+  }
+
+  .topic-card .meta {
+    margin-top: 12px;
+    display: flex;
+    gap: 16px;
+  }
+
+  .topic-card .meta span {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  footer {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 32px;
+    border-top: 1px solid var(--border);
+    color: var(--text3);
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>system-design-practice</h1>
+  <p>Interactive decision trees and references for common system design problems. Pick a topic and walk through the tradeoffs.</p>
+</header>
+
+<section class="topics">
+
+  <a class="topic-card" href="db-decision-tree.html">
+    <div class="tag">Decision Tree</div>
+    <h2>Choosing the Right Database</h2>
+    <p>Read vs write optimisation, scaling patterns, and when to pick SQL, NoSQL, or specialised stores.</p>
+    <div class="meta">
+      <span>databases</span>
+      <span>scaling</span>
+      <span>tradeoffs</span>
+    </div>
+  </a>
+
+  <!-- Add more topic cards here -->
+
+</section>
+
+<footer>more topics coming soon</footer>
+
+</body>
+</html>
