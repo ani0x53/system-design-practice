@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Database Scaling — System Design Decision Tree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #111111;
+    --bg3: #181818;
+    --bg4: #1f1f1f;
+    --border: #2a2a2a;
+    --border2: #333;
+    --text: #e8e8e8;
+    --text2: #999;
+    --text3: #666;
+    --accent: #e8ff00;
+    --accent2: #00ffc8;
+    --accent3: #ff6b35;
+    --accent4: #a78bfa;
+    --accent5: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 24px 32px 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .header-left {}
+  .site-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -.02em;
+    line-height: 1.2;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .header-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .meta-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    border: 1px solid var(--border2);
+    padding: 3px 8px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .meta-chip .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .progress-track {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .progress-bar {
+    width: 120px;
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width .4s ease;
+    width: 0%;
+  }
+
+  .breadcrumb {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    max-width: 380px;
+    justify-content: flex-end;
+  }
+
+  .bc-item { color: var(--text2); }
+  .bc-sep { color: var(--text3); opacity: .5; }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 280px;
+    min-height: calc(100vh - 89px);
+  }
+
+  /* ── LEFT SIDEBAR ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 89px);
+  }
+
+  .sidebar-section {
+    padding: 0 20px;
+    margin-bottom: 24px;
+  }
+
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .tree-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12px;
+    color: var(--text3);
+    cursor: pointer;
+    transition: color .15s;
+    font-family: var(--mono);
+  }
+
+  .tree-item:hover { color: var(--text2); }
+  .tree-item.visited { color: var(--text2); }
+  .tree-item.current { color: var(--accent); }
+
+  .tree-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--border2);
+    flex-shrink: 0;
+    transition: all .15s;
+  }
+
+  .tree-item.visited .tree-dot { background: var(--text3); border-color: var(--text3); }
+  .tree-item.current .tree-dot { background: var(--accent); border-color: var(--accent); }
+
+  .numbers-ref {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 0 20px 20px;
+  }
+
+  .num-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .num-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+
+  .num-row:last-child { border-bottom: none; }
+
+  .num-k {
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  .num-v {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .num-v.green { color: var(--green); }
+  .num-v.amber { color: var(--amber); }
+  .num-v.red { color: var(--red); }
+
+  /* ── MAIN ── */
+  .main {
+    padding: 32px 36px;
+    max-width: 780px;
+  }
+
+  /* STATE */
+  .state { display: none; }
+  .state.on { display: block; animation: fadeIn .2s ease; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* QUESTION */
+  .q-step {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .q-title {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+
+  .q-subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-bottom: 28px;
+    max-width: 560px;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .opt {
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all .15s;
+    background: var(--bg2);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .opt::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: background .15s;
+  }
+
+  .opt:hover {
+    border-color: var(--border2);
+    background: var(--bg3);
+  }
+
+  .opt:hover::before { background: var(--accent); }
+
+  .opt-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    border: 1px solid var(--border2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    min-width: 24px;
+    text-align: center;
+    transition: all .15s;
+  }
+
+  .opt:hover .opt-key {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .opt-body {}
+
+  .opt-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .opt-sub {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .opt-numbers {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 5px;
+  }
+
+  /* RESULT */
+  .result-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .result-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .result-title-wrap {}
+
+  .result-verdict {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .result-db {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .result-tagline {
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: .02em;
+  }
+
+  .tag-g { background: rgba(74,222,128,.12); color: var(--green); border: 1px solid rgba(74,222,128,.25); }
+  .tag-r { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.25); }
+  .tag-a { background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.25); }
+  .tag-b { background: rgba(56,189,248,.12); color: var(--accent5); border: 1px solid rgba(56,189,248,.25); }
+  .tag-p { background: rgba(167,139,250,.12); color: var(--accent4); border: 1px solid rgba(167,139,250,.25); }
+  .tag-y { background: rgba(232,255,0,.12); color: var(--accent); border: 1px solid rgba(232,255,0,.25); }
+  .tag-t { background: rgba(0,255,200,.12); color: var(--accent2); border: 1px solid rgba(0,255,200,.25); }
+
+  .section-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+
+  .section-block h4 {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .section-block p {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.65;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    gap: 12px;
+  }
+
+  .metric-row:last-child { border-bottom: none; }
+
+  .metric-k {
+    color: var(--text2);
+    flex: 1;
+  }
+
+  .metric-v {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  .metric-v.good { color: var(--green); }
+  .metric-v.warn { color: var(--amber); }
+  .metric-v.bad { color: var(--red); }
+  .metric-v.info { color: var(--accent5); }
+  .metric-v.acc { color: var(--accent); }
+
+  .callout {
+    border-left: 2px solid;
+    padding: 10px 12px;
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .callout.warn {
+    border-color: var(--amber);
+    background: rgba(251,191,36,.06);
+    color: var(--amber);
+  }
+
+  .callout.good {
+    border-color: var(--green);
+    background: rgba(74,222,128,.06);
+    color: #86efac;
+  }
+
+  .callout.info {
+    border-color: var(--accent5);
+    background: rgba(56,189,248,.06);
+    color: #7dd3fc;
+  }
+
+  .callout.danger {
+    border-color: var(--red);
+    background: rgba(248,113,113,.06);
+    color: #fca5a5;
+  }
+
+  .code-block {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 12px 14px;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-top: 8px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .code-block .kw { color: var(--accent4); }
+  .code-block .str { color: var(--accent2); }
+  .code-block .num { color: var(--accent); }
+  .code-block .cm { color: var(--text3); }
+
+  .also-consider {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text3);
+  }
+
+  .also-consider span {
+    color: var(--text2);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+  }
+
+  /* COMPARISON TABLE */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .compare-cell {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    background: var(--bg2);
+  }
+
+  .compare-cell h5 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .compare-cell p {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  /* BACK / RESET */
+  .nav-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: .02em;
+  }
+
+  .btn:hover {
+    border-color: var(--text3);
+    color: var(--text2);
+  }
+
+  .btn-primary {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-primary:hover {
+    background: var(--accent);
+    color: #000;
+  }
+
+  /* ── RIGHT PANEL ── */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    padding: 24px 20px;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 89px);
+  }
+
+  .rp-section {
+    margin-bottom: 24px;
+  }
+
+  .rp-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .db-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: var(--bg2);
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .db-card:hover { border-color: var(--border2); background: var(--bg3); }
+  .db-card.highlight { border-color: var(--accent); }
+
+  .db-card-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .db-card.highlight .db-card-name { color: var(--accent); }
+
+  .db-card-meta {
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.4;
+  }
+
+  .db-card-stats {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .db-stat {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    background: var(--bg3);
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+  }
+
+  .rule-item {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+    display: flex;
+    gap: 8px;
+  }
+
+  .rule-item:last-child { border-bottom: none; }
+
+  .rule-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── INTRO ── */
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .intro-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    background: var(--bg2);
+  }
+
+  .intro-card-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .intro-card p {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .big-number {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar, .right-panel { display: none; }
+    .main { max-width: 100%; padding: 24px 20px; }
+  }
+
+  /* Keyboard hint */
+  .kbd-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .kbd {
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 9px;
+    color: var(--text3);
+  }
+
+  /* Footer */
+  .result-footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="site-label">System Design Practice</div>
+    <h1>Database Scaling — <span>Decision Tree</span></h1>
+    <div class="header-meta">
+      <div class="meta-chip"><div class="dot" style="background:var(--green)"></div> Read optimisation</div>
+      <div class="meta-chip"><div class="dot" style="background:var(--amber)"></div> Write optimisation</div>
+      <div class="meta-chip"><div class="dot" style="background:var(--accent4)"></div> Mixed workloads</div>
+      <div class="meta-chip">12 decision paths</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="progress-track">
+      <span id="step-label">step 0</span>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Postgres breaking points</div>
+      <div class="numbers-ref">
+        <div class="num-title">Reads / second (single node)</div>
+        <div class="num-row"><span class="num-k">PK lookup</span><span class="num-v green">~50k/s</span></div>
+        <div class="num-row"><span class="num-k">2-table JOIN</span><span class="num-v amber">~15k/s</span></div>
+        <div class="num-row"><span class="num-k">Aggregation</span><span class="num-v amber">~3k/s</span></div>
+        <div class="num-row"><span class="num-k">Full-text search</span><span class="num-v red">&lt;1k/s</span></div>
+      </div>
+      <div class="numbers-ref">
+        <div class="num-title">Writes / second (single node)</div>
+        <div class="num-row"><span class="num-k">Batch inserts ×100</span><span class="num-v green">~20k rows/s</span></div>
+        <div class="num-row"><span class="num-k">Single-row inserts</span><span class="num-v amber">~5–8k/s</span></div>
+        <div class="num-row"><span class="num-k">Write + 3 indexes</span><span class="num-v red">~2–3k/s</span></div>
+        <div class="num-row"><span class="num-k">Sustained 10k+/s</span><span class="num-v red">WAL ceiling</span></div>
+      </div>
+      <div class="numbers-ref">
+        <div class="num-title">Other hard limits</div>
+        <div class="num-row"><span class="num-k">Max connections</span><span class="num-v amber">100 default</span></div>
+        <div class="num-row"><span class="num-k">w/ pgBouncer</span><span class="num-v green">~10k virtual</span></div>
+        <div class="num-row"><span class="num-k">Table rows →slow</span><span class="num-v amber">&gt;500M rows</span></div>
+        <div class="num-row"><span class="num-k">Async replica lag</span><span class="num-v amber">10ms–2s</span></div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navigation</div>
+      <div id="tree-nav"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- ══ ROOT ══ -->
+    <div id="q0" class="state on">
+      <div class="q-step">Starting point</div>
+      <div class="q-title">What is your primary bottleneck?</div>
+      <div class="q-subtitle">Be honest about what's actually slow before choosing a solution. The wrong diagnosis is the most common scaling mistake.</div>
+
+      <div class="intro-grid">
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--green)">Signs of a read problem</div>
+          <p>SELECT queries are slow. Dashboard pages take 2–5s. DB CPU is high during peak reads. Query log shows repeated identical SELECTs.</p>
+        </div>
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--amber)">Signs of a write problem</div>
+          <p>INSERT/UPDATE latency climbing. WAL disk usage grows. Replication lag increasing. DB write queue backing up. Application 504s on form submits.</p>
+        </div>
+      </div>
+
+      <div class="kbd-hint"><kbd class="kbd">click</kbd> an option or press <kbd class="kbd">1</kbd> <kbd class="kbd">2</kbd> <kbd class="kbd">3</kbd></div>
+
+      <div class="options" id="opts-q0">
+        <div class="opt" onclick="go('q1-read','Read-heavy')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Read-heavy</div>
+            <div class="opt-sub">Queries are slow, high SELECT volume, users see latency fetching data. Writes are fine.</div>
+            <div class="opt-numbers">Typical signal: &gt;80% of DB load is SELECT statements</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-write','Write-heavy')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Write-heavy</div>
+            <div class="opt-sub">DB can't keep up with inserts/updates. Write latency climbing, replication lag growing.</div>
+            <div class="opt-numbers">Typical signal: sustained &gt;5k inserts/s hitting a single Postgres node</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-both','Mixed workload')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Both — mixed workload</div>
+            <div class="opt-sub">High reads AND writes simultaneously. General throughput ceiling. Both paths are saturated.</div>
+            <div class="opt-numbers">Typical signal: CPU &gt;80% from both read and write operations</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ READ BRANCH ══ -->
+    <div id="q1-read" class="state">
+      <div class="q-step">Read optimisation → step 1 of 2</div>
+      <div class="q-title">What kind of reads are bottlenecked?</div>
+      <div class="q-subtitle">The read pattern determines the solution. Key lookups, relational queries, analytics, and search each have completely different optimal tools.</div>
+      <div class="options">
+        <div class="opt" onclick="go('q2-simple','Key lookups / simple fetch')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Key lookups — fetch by ID, no JOINs</div>
+            <div class="opt-sub">SELECT * FROM users WHERE id = ?. Session lookups, profile fetches, product by SKU, config values.</div>
+            <div class="opt-numbers">Postgres handles ~50k/s. Redis handles ~500k/s. DynamoDB handles millions/s.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q2-relational','Complex relational queries')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Relational — JOINs, filters, aggregations</div>
+            <div class="opt-sub">Multi-table JOINs, WHERE across columns, ORDER BY, pagination. Requires SQL semantics.</div>
+            <div class="opt-numbers">Postgres JOIN on indexed FK: ~15k/s. Complex JOIN: ~2–5k/s.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q2-analytics','Analytics / aggregations over large datasets')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Analytics — GROUP BY, SUM, COUNT over millions of rows</div>
+            <div class="opt-sub">Dashboards, reports, time-series aggregations, funnel analysis. Full table scans.</div>
+            <div class="opt-numbers">Postgres: &lt;1k analytical queries/s. ClickHouse: 10B rows in &lt;1s.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-search','Full-text / fuzzy search')">
+          <span class="opt-key">4</span>
+          <div class="opt-body">
+            <div class="opt-title">Full-text / fuzzy / relevance-ranked search</div>
+            <div class="opt-sub">Autocomplete, "search for products named X", typo tolerance, relevance scoring.</div>
+            <div class="opt-numbers">Postgres FTS: ~500/s. Elasticsearch: ~10k searches/s with ranking.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="q2-simple" class="state">
+      <div class="q-step">Read → key lookups → step 2 of 2</div>
+      <div class="q-title">Volume and data freshness requirements?</div>
+      <div class="q-subtitle">Key lookups scale very differently depending on read volume and how stale the data can be.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-cache','Under 50k reads/s, data changes infrequently')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Under 50k reads/s, stale data OK for seconds</div>
+            <div class="opt-sub">User profiles, product catalogue, config values, content that changes rarely. Cache hit rate matters most.</div>
+            <div class="opt-numbers">Redis at 1ms p99. 99% cache hit rate → DB sees ~500 req/s not 50k.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-redis-dedicated','50k–500k reads/s, data changes often')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">50k–500k reads/s, frequent updates, cache TTLs impractical</div>
+            <div class="opt-sub">Real-time counters, live game state, inventory levels, presence indicators — data changes every second.</div>
+            <div class="opt-numbers">Redis dedicated cluster: 500k ops/s per node. Sub-millisecond at any scale.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-dynamo','500k+ reads/s or global multi-region needed')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">500k+ reads/s, or need &lt;10ms globally</div>
+            <div class="opt-sub">Massive key-value at global scale. Sessions, leaderboards, IoT device state, feature flags at enterprise scale.</div>
+            <div class="opt-numbers">DynamoDB: unlimited horizontal scale. ~1–3ms read globally via DAX.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="q2-relational" class="state">
+      <div class="q-step">Read → relational → step 2 of 2</div>
+      <div class="q-title">Read volume and query complexity?</div>
+      <div class="q-subtitle">Relational reads scale horizontally with read replicas up to a point. After that, caching and query optimisation matter more than more replicas.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-replica-1','Under 5k relational reads/s')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Under 5k complex reads/s</div>
+            <div class="opt-sub">Single replica handles this. Most early-stage apps. Check your EXPLAIN ANALYZE first — you likely have a missing index.</div>
+            <div class="opt-numbers">1 replica = 2–4× read capacity. Check slow query log for queries &gt;100ms first.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-replica-many','5k–50k relational reads/s')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">5k–50k relational reads/s</div>
+            <div class="opt-sub">Multiple replicas + Redis cache for hot paths. Route reads round-robin. Most mid-scale apps.</div>
+            <div class="opt-numbers">3 replicas + 90% cache hit rate = effectively unlimited relational reads for most apps.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-citus-read','50k+ relational reads/s, or table size &gt;500M rows')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">50k+ relational reads/s, or giant tables</div>
+            <div class="opt-sub">Table-level locks from VACUUM start hurting. Query planner degrades on very large tables. Time to shard or partition.</div>
+            <div class="opt-numbers">Postgres query planner degrades past ~500M rows per table. Declarative partitioning helps.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="q2-analytics" class="state">
+      <div class="q-step">Read → analytics → step 2 of 2</div>
+      <div class="q-title">Real-time or batch analytics?</div>
+      <div class="q-subtitle">Never run analytical queries on your OLTP primary — they lock rows and kill transactional performance. The question is which separate store to add.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-clickhouse','Real-time — sub-second on huge datasets')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Real-time dashboards, sub-second response on billions of rows</div>
+            <div class="opt-sub">Live operational analytics, event counting, cohort analysis, product dashboards.</div>
+            <div class="opt-numbers">ClickHouse: 1B row COUNT in ~0.1s. Ingests 100k+ rows/s. 10× compression vs Postgres.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-warehouse','Batch — hours/daily acceptable, BI tools')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Batch — hourly or daily, BI tools, historical reports</div>
+            <div class="opt-sub">ETL pipelines, Looker/Tableau, executive dashboards, monthly rollups. Query latency of seconds/minutes acceptable.</div>
+            <div class="opt-numbers">BigQuery: $5/TB queried. Redshift: best for sustained heavy BI. Snowflake: best for data sharing.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ WRITE BRANCH ══ -->
+    <div id="q1-write" class="state">
+      <div class="q-step">Write optimisation → step 1 of 3</div>
+      <div class="q-title">Is the write load sustained or bursty?</div>
+      <div class="q-subtitle">This is the first fork. Bursty and sustained loads have completely different solutions. Confusing them leads to over-engineering.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-queue','Bursty — spikes at predictable times')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Bursty — 10× normal load for minutes, then quiet</div>
+            <div class="opt-sub">Lunch rush on a food app. Ticket sales going live. Game event start. Batch imports. Traffic spikes predictably then drops.</div>
+            <div class="opt-numbers">A Kafka topic absorbs spikes instantly. Consumer drains at DB's max speed (~5k writes/s).</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q2-write-volume','Sustained — high write volume continuously')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Sustained — high write volume all the time</div>
+            <div class="opt-sub">IoT telemetry, financial transactions, event streaming, user activity logging at scale.</div>
+            <div class="opt-numbers">Sustained &gt;5k writes/s starts stressing a single Postgres node. &gt;20k/s requires architectural change.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="q2-write-volume" class="state">
+      <div class="q-step">Write → sustained → step 2 of 3</div>
+      <div class="q-title">Do you need relational integrity on this data?</div>
+      <div class="q-subtitle">SQL and ACID transactions are powerful but limit write scalability. If you genuinely need them, you shard. If you don't, purpose-built stores are faster and cheaper.</div>
+      <div class="options">
+        <div class="opt" onclick="go('q3-write-vol','Yes — JOINs, foreign keys, ACID transactions')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Yes — need SQL, JOINs, and ACID</div>
+            <div class="opt-sub">Orders and order_items must be consistent. Inventory must not go negative. Financial double-entry bookkeeping.</div>
+            <div class="opt-numbers">Every ACID guarantee has a throughput cost. Cross-row transactions add ~2–5ms overhead.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q3-write-shape','No — key-based writes, eventual consistency OK')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">No — append-only, key-based, or eventual consistency OK</div>
+            <div class="opt-sub">Event logs, sensor data, activity streams, user actions. Each write is independent. No cross-row transactions needed.</div>
+            <div class="opt-numbers">Without ACID overhead: Cassandra handles 1M+ writes/s on a modest cluster.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="q3-write-vol" class="state">
+      <div class="q-step">Write → sustained → relational → step 3 of 3</div>
+      <div class="q-title">Sustained writes per second?</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-pg-batch','Under 10k writes/s')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Under 10k writes/s</div>
+            <div class="opt-sub">Postgres handles this with batching and a write queue. No schema change needed.</div>
+            <div class="opt-numbers">Batch 100 rows per INSERT → ~20k rows/s. Single inserts → ~5k/s.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-citus','10k–100k writes/s')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">10k–100k writes/s</div>
+            <div class="opt-sub">Need to shard. Citus splits Postgres across nodes automatically on a distribution column.</div>
+            <div class="opt-numbers">8 Citus shards × 10k writes/s = 80k aggregate writes/s. Linear scaling.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-citus','100k+ writes/s, still need SQL')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">100k+ writes/s, still need SQL</div>
+            <div class="opt-sub">Aggressive sharding with Citus, or consider CockroachDB / YugabyteDB for distributed SQL.</div>
+            <div class="opt-numbers">CockroachDB: distributed SQL, auto-rebalancing. ~10–50k writes/s per node, scales horizontally.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="q3-write-shape" class="state">
+      <div class="q-step">Write → sustained → key-based → step 3 of 3</div>
+      <div class="q-title">What is the shape of the data?</div>
+      <div class="q-subtitle">The data shape determines which write-optimised store fits best. Each is built around a specific access pattern.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-cassandra','Wide rows — entity + time-ordered events')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Wide rows — one entity, many time-ordered events</div>
+            <div class="opt-sub">user_id → all their messages. device_id → all sensor readings. conversation_id → all chat events.</div>
+            <div class="opt-numbers">Cassandra/ScyllaDB: 1M+ writes/s on a 10-node cluster. p99 write latency ~1ms.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-dynamo-write','Flat key-value — one document per key')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Flat key-value — one document per partition key</div>
+            <div class="opt-sub">Session store, player game state, order status, feature flags, real-time leaderboard entries.</div>
+            <div class="opt-numbers">DynamoDB: unlimited WCU. ~1–3ms write globally. ~$1.25 per million writes.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-timeseries','Time-series — numeric metrics, timestamps')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Time-series — numeric metrics, monotonic timestamps</div>
+            <div class="opt-sub">CPU/memory metrics, stock prices, IoT sensor readings, request latency percentiles.</div>
+            <div class="opt-numbers">TimescaleDB: 500k+ rows/s ingest. InfluxDB: 1M+ data points/s. 10–50× compression vs Postgres.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MIXED BRANCH ══ -->
+    <div id="q1-both" class="state">
+      <div class="q-step">Mixed workload → step 1 of 1</div>
+      <div class="q-title">What best describes your data access pattern?</div>
+      <div class="q-subtitle">Mixed workloads are often solved by separating concerns — one store for writes, a different one (or model) for reads.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-pg-stack','Relational — JOINs, complex queries, ACID')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Relational — JOINs, SQL, ACID transactions</div>
+            <div class="opt-sub">Standard web app. Users, posts, orders, inventory. Rich queries on writes AND reads.</div>
+            <div class="opt-numbers">The full Postgres stack handles hundreds of thousands of ops/s before you need to change the DB.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-dynamo-mixed','Key-based — simple get/put, no JOINs')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Key-based — no JOINs, simple fetch and store</div>
+            <div class="opt-sub">Gaming, real-time bidding, live counters, presence tracking. Both reads and writes are key-based.</div>
+            <div class="opt-numbers">DynamoDB handles both at any scale. DAX cache layer for hot reads: &lt;1ms.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-cqrs','Asymmetric — simple writes, complex reads')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Asymmetric — writes are appends, reads are complex</div>
+            <div class="opt-sub">Event sourcing. Writes are fast appends. Read queries are expensive projections over the event log.</div>
+            <div class="opt-numbers">CQRS: writes to Kafka/event store (~1M/s), read models built asynchronously (Elasticsearch, Redis, Postgres).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+
+    <!-- Redis + Postgres replica -->
+    <div id="r-cache" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(74,222,128,.1);color:var(--green)">PG</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended solution</div>
+          <div class="result-db" style="color:var(--green)">Redis + Postgres read replica</div>
+          <div class="result-tagline" style="color:var(--text2)">Solve in a day. Handle 500k+ reads/s on cached paths.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">keep full SQL</span>
+        <span class="tag tag-g">no migration</span>
+        <span class="tag tag-g">cache hit rate = free scale</span>
+        <span class="tag tag-a">cache invalidation needed</span>
+        <span class="tag tag-r">replication lag: 10ms–2s</span>
+      </div>
+      <div class="section-block">
+        <h4>What to build</h4>
+        <p>Add Redis in front of your hot read paths. Set TTLs on all keys. Route all SELECT queries to a Postgres read replica; writes stay on primary. pgBouncer for connection pooling. This stack is often enough to 10–100× your read capacity in 1–2 days with zero schema changes.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">Redis single node reads/s</span><span class="metric-v good">~500k ops/s</span></div>
+        <div class="metric-row"><span class="metric-k">Redis p99 latency (LAN)</span><span class="metric-v good">&lt;0.5ms</span></div>
+        <div class="metric-row"><span class="metric-k">Postgres read replica reads/s</span><span class="metric-v good">~50k simple, ~5k complex</span></div>
+        <div class="metric-row"><span class="metric-k">Memory per 1M cached objects (avg 1KB)</span><span class="metric-v info">~1GB RAM</span></div>
+        <div class="metric-row"><span class="metric-k">pgBouncer: raw connections → virtual</span><span class="metric-v good">100 → 10,000</span></div>
+        <div class="metric-row"><span class="metric-k">Replication lag (async, light load)</span><span class="metric-v warn">~10–50ms</span></div>
+        <div class="metric-row"><span class="metric-k">Replication lag (async, heavy load)</span><span class="metric-v warn">100ms–2s</span></div>
+      </div>
+      <div class="callout warn">Cache stampede: when a hot key expires, all concurrent requests miss and hammer the DB simultaneously. Fix with probabilistic early expiry or a distributed lock (one fetches, others wait). Add jitter to TTLs: <code>TTL + random(0, 30s)</code>.</div>
+      <div class="callout info">Read-your-own-writes pattern: after a user writes data, store their write timestamp in session. Route their reads to primary for 5–10s. Prevents "I just posted a review but it disappeared" confusion caused by replica lag.</div>
+      <div class="section-block">
+        <h4>Architecture sketch</h4>
+        <div class="code-block"><span class="cm">// App layer read path</span>
+<span class="kw">function</span> getUser(id) {
+  <span class="kw">const</span> cached = <span class="kw">await</span> redis.get(<span class="str">`user:${id}`</span>);
+  <span class="kw">if</span> (cached) <span class="kw">return</span> JSON.parse(cached);
+
+  <span class="cm">// Cache miss → read from replica</span>
+  <span class="kw">const</span> user = <span class="kw">await</span> replica.query(
+    <span class="str">'SELECT * FROM users WHERE id = $1'</span>, [id]
+  );
+  <span class="kw">await</span> redis.setex(
+    <span class="str">`user:${id}`</span>, <span class="num">300</span> + Math.random() * <span class="num">30</span>, <span class="cm">// TTL jitter</span>
+    JSON.stringify(user)
+  );
+  <span class="kw">return</span> user;
+}</div>
+      </div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Redis dedicated -->
+    <div id="r-redis-dedicated" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(248,113,113,.1);color:var(--red)">RD</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--red)">Recommended solution</div>
+          <div class="result-db" style="color:var(--red)">Redis as primary store (not cache)</div>
+          <div class="result-tagline" style="color:var(--text2)">Sub-millisecond at 500k+ ops/s. Data lives in Redis, not just cached there.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">500k+ ops/s per node</span>
+        <span class="tag tag-g">&lt;1ms p99</span>
+        <span class="tag tag-b">Lua scripting for atomics</span>
+        <span class="tag tag-r">memory-bound (no disk offload)</span>
+        <span class="tag tag-r">limited query patterns</span>
+      </div>
+      <div class="section-block">
+        <h4>What to build</h4>
+        <p>Redis Cluster with 3+ primary nodes + replicas. Use Redis data structures — Hash for objects, Sorted Set for leaderboards, HyperLogLog for cardinality, Pub/Sub for events. Persist with RDB snapshots + AOF. Keep Postgres as the durable record of truth for anything that needs SQL; Redis holds the hot operational state.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">Single Redis node ops/s</span><span class="metric-v good">~500k–1M ops/s</span></div>
+        <div class="metric-row"><span class="metric-k">Redis Cluster (6 nodes)</span><span class="metric-v good">~3–5M ops/s aggregate</span></div>
+        <div class="metric-row"><span class="metric-k">p99 latency (LAN)</span><span class="metric-v good">&lt;1ms</span></div>
+        <div class="metric-row"><span class="metric-k">Memory per million small objects</span><span class="metric-v warn">~100MB–2GB depending on type</span></div>
+        <div class="metric-row"><span class="metric-k">Cost of 64GB Redis node (AWS)</span><span class="metric-v info">~$300/month (ElastiCache)</span></div>
+      </div>
+      <div class="callout warn">Redis is memory-bound. Cost scales with dataset size. If your hot dataset exceeds ~100GB, evaluate whether DynamoDB (which uses SSD) would be cheaper at your access pattern.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- DynamoDB read -->
+    <div id="r-dynamo" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.1);color:var(--accent5)">DDB</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent5)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent5)">DynamoDB (+ DAX for sub-ms reads)</div>
+          <div class="result-tagline" style="color:var(--text2)">Unlimited scale, zero ops, single-digit ms anywhere on earth.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-b">auto-scales infinitely</span>
+        <span class="tag tag-b">global tables: multi-region</span>
+        <span class="tag tag-b">fully managed</span>
+        <span class="tag tag-r">no SQL JOINs</span>
+        <span class="tag tag-r">access patterns locked at design time</span>
+        <span class="tag tag-a">hot partition problem exists</span>
+      </div>
+      <div class="section-block">
+        <h4>What to build</h4>
+        <p>Design your access patterns first, then your schema — this is mandatory with DynamoDB. Partition key determines which shard your data lives on. GSIs (Global Secondary Indexes) enable different access patterns. DynamoDB Accelerator (DAX) is an in-process cache that brings reads to microseconds.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">Read latency (strongly consistent)</span><span class="metric-v good">~1–3ms</span></div>
+        <div class="metric-row"><span class="metric-k">Read latency with DAX</span><span class="metric-v good">&lt;100µs</span></div>
+        <div class="metric-row"><span class="metric-k">Max item size</span><span class="metric-v warn">400KB per item</span></div>
+        <div class="metric-row"><span class="metric-k">Cost per million reads (eventual)</span><span class="metric-v info">$0.25 (RCU)</span></div>
+        <div class="metric-row"><span class="metric-k">Cost per million writes</span><span class="metric-v info">$1.25 (WCU)</span></div>
+        <div class="metric-row"><span class="metric-k">Global Tables (multi-region) extra cost</span><span class="metric-v warn">+2× write cost per region</span></div>
+      </div>
+      <div class="callout warn">Hot partition throttling: if one partition key (a celebrity user, a viral product) receives >3,000 RCU/s or >1,000 WCU/s, DynamoDB throttles it. Use composite keys (user_id + shard_suffix) to spread hot keys across partitions.</div>
+      <div class="callout info">You cannot do ad-hoc queries on DynamoDB like you can on Postgres. "Show me all users who signed up last week" requires a GSI on created_at or a separate analytics store (Athena over S3).</div>
+      <div class="section-block">
+        <h4>Key design example — social app</h4>
+        <div class="code-block"><span class="cm">// Single-table design</span>
+PK (partition)      SK (sort)              Data
+─────────────────   ────────────────       ──────────────
+<span class="str">USER#alice</span>          <span class="str">PROFILE</span>                {name, bio, ...}
+<span class="str">USER#alice</span>          <span class="str">POST#2024-01-15T10:00</span>  {content, likes}
+<span class="str">USER#alice</span>          <span class="str">FOLLOWER#bob</span>           {followedAt}
+<span class="str">POST#xyz123</span>         <span class="str">COMMENT#2024-01-15T11</span>  {text, author}
+
+<span class="cm">// GSI: find all posts by date</span>
+GSI PK: <span class="str">POST#xyz123</span>  GSI SK: <span class="str">2024-01-15T10:00</span></div>
+      </div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Replica 1 -->
+    <div id="r-replica-1" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(74,222,128,.1);color:var(--green)">PG</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended solution</div>
+          <div class="result-db" style="color:var(--green)">Postgres + 1 read replica + pgBouncer</div>
+          <div class="result-tagline" style="color:var(--text2)">Check your query plans first. A missing index is probably the real problem.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">keep all SQL</span>
+        <span class="tag tag-g">minutes to add</span>
+        <span class="tag tag-a">replication lag</span>
+      </div>
+      <div class="section-block">
+        <h4>What to do — in order</h4>
+        <p>1. Run EXPLAIN ANALYZE on your slow queries. A missing index is 10× more likely than needing a replica. 2. Add pgBouncer — goes from 100 connections to 10,000 virtual, often free throughput gain. 3. Add one read replica; route all non-write queries there. 4. Add Redis for the top 5 most-repeated queries if needed.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">Index scan vs sequential scan (1M rows)</span><span class="metric-v good">0.1ms vs 200ms</span></div>
+        <div class="metric-row"><span class="metric-k">pgBouncer connection overhead</span><span class="metric-v good">~0.2ms added</span></div>
+        <div class="metric-row"><span class="metric-k">1 replica: effective read throughput</span><span class="metric-v good">2–4× primary alone</span></div>
+        <div class="metric-row"><span class="metric-k">RDS read replica cost (db.t3.medium)</span><span class="metric-v info">~$50/month</span></div>
+      </div>
+      <div class="callout good">Missing index diagnosis: <code>SELECT * FROM pg_stat_user_tables WHERE seq_scan > idx_scan AND n_live_tup > 10000;</code> — any table with more seq_scans than index_scans and over 10k rows needs an index investigation.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Replica many -->
+    <div id="r-replica-many" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(74,222,128,.1);color:var(--green)">PG×</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended solution</div>
+          <div class="result-db" style="color:var(--green)">Postgres + Redis cache + 3–5 read replicas</div>
+          <div class="result-tagline" style="color:var(--text2)">Route and cache intelligently. Handles 50k–200k relational reads/s.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">full SQL on all replicas</span>
+        <span class="tag tag-g">linear read scaling</span>
+        <span class="tag tag-a">cache invalidation complexity</span>
+        <span class="tag tag-a">cross-region replica lag</span>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">3 replicas + 90% cache hit rate</span><span class="metric-v good">~150k effective reads/s</span></div>
+        <div class="metric-row"><span class="metric-k">5 replicas, no cache</span><span class="metric-v good">~75k complex reads/s</span></div>
+        <div class="metric-row"><span class="metric-k">Replica routing: round-robin overhead</span><span class="metric-v good">&lt;0.5ms</span></div>
+        <div class="metric-row"><span class="metric-k">RDS read replica cost (db.r6g.xlarge)</span><span class="metric-v info">~$350/month</span></div>
+        <div class="metric-row"><span class="metric-k">Max useful replicas before WAL overhead</span><span class="metric-v warn">~5–7 replicas per primary</span></div>
+      </div>
+      <div class="callout warn">More than 5–7 replicas per primary creates WAL shipping overhead that starts to slow down writes on the primary itself. If you need more read capacity, look at partitioning or caching first.</div>
+      <div class="callout info">PgPool-II or Pgbouncer-style routing: automatically send reads to replicas based on query type (SELECT → replica, DML → primary). Transparent to the application.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Citus read -->
+    <div id="r-citus-read" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(251,191,36,.1);color:var(--amber)">CTX</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--amber)">Recommended solution</div>
+          <div class="result-db" style="color:var(--amber)">Citus (sharded Postgres) + table partitioning</div>
+          <div class="result-tagline" style="color:var(--text2)">Keep SQL. Distribute data across shards. Works for both reads and writes.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">keep SQL</span>
+        <span class="tag tag-a">cross-shard queries fan out</span>
+        <span class="tag tag-r">complex ops and migrations</span>
+        <span class="tag tag-y">linear scale with shard count</span>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">8-shard Citus cluster reads/s</span><span class="metric-v good">~400k simple reads/s</span></div>
+        <div class="metric-row"><span class="metric-k">Cross-shard query overhead</span><span class="metric-v warn">2–10× single-shard</span></div>
+        <div class="metric-row"><span class="metric-k">Intra-shard JOIN speed</span><span class="metric-v good">Same as single Postgres</span></div>
+        <div class="metric-row"><span class="metric-k">Declarative partitioning (no shard)</span><span class="metric-v good">10–100× on range queries</span></div>
+      </div>
+      <div class="callout info">Try declarative partitioning first — partition a 2B row table by created_at into monthly partitions. Queries with a time filter only scan 1 partition instead of all 2B rows. This often solves the problem without sharding.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- ClickHouse -->
+    <div id="r-clickhouse" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(0,255,200,.1);color:var(--accent2)">CH</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent2)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent2)">ClickHouse (columnar OLAP)</div>
+          <div class="result-tagline" style="color:var(--text2)">Billion-row aggregations in under a second. Not for transactional writes.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-t">1B rows in ~0.1s</span>
+        <span class="tag tag-t">10× Postgres compression</span>
+        <span class="tag tag-t">vectorised execution</span>
+        <span class="tag tag-r">not for OLTP</span>
+        <span class="tag tag-r">no UPDATE/DELETE at row level</span>
+      </div>
+      <div class="section-block">
+        <h4>What to build</h4>
+        <p>Keep Postgres/Kafka as your write path. Stream events to ClickHouse via Kafka Connect or ClickHouse's Kafka table engine. ClickHouse handles the analytical queries. Never make ClickHouse your primary write store — it's a read engine with append-only writes.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">COUNT(*) on 1B rows</span><span class="metric-v good">~0.05–0.1s</span></div>
+        <div class="metric-row"><span class="metric-k">GROUP BY aggregation, 100M rows</span><span class="metric-v good">~0.2–0.5s</span></div>
+        <div class="metric-row"><span class="metric-k">Storage compression ratio</span><span class="metric-v good">5–10× vs Postgres</span></div>
+        <div class="metric-row"><span class="metric-k">Ingest throughput (MergeTree engine)</span><span class="metric-v good">100k–500k rows/s</span></div>
+        <div class="metric-row"><span class="metric-k">Self-hosted ClickHouse (24-core server)</span><span class="metric-v info">~$500–800/month</span></div>
+        <div class="metric-row"><span class="metric-k">ClickHouse Cloud (managed)</span><span class="metric-v info">~$0.05/GB storage + compute</span></div>
+      </div>
+      <div class="callout warn">ClickHouse does not support row-level updates the same way Postgres does. The CollapsingMergeTree and ReplacingMergeTree engines handle updates by appending tombstones and merging asynchronously — different mental model.</div>
+      <div class="section-block">
+        <h4>Query comparison — same query, different DBs</h4>
+        <div class="code-block"><span class="cm">-- Count events per day, last 30 days, 2B rows total</span>
+<span class="cm">-- Postgres: ~45 seconds (sequential scan)</span>
+<span class="cm">-- ClickHouse: ~0.3 seconds (columnar, vectorised)</span>
+
+<span class="kw">SELECT</span> toDate(created_at), count()
+<span class="kw">FROM</span> events
+<span class="kw">WHERE</span> created_at > now() - <span class="kw">INTERVAL</span> <span class="num">30</span> DAY
+<span class="kw">GROUP BY</span> <span class="num">1</span>
+<span class="kw">ORDER BY</span> <span class="num">1</span></div>
+      </div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Data Warehouse -->
+    <div id="r-warehouse" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.1);color:var(--accent5)">DW</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent5)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent5)">BigQuery / Redshift / Snowflake</div>
+          <div class="result-tagline" style="color:var(--text2)">Petabyte-scale batch analytics. Pay per query. BI tool native.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-b">petabyte scale</span>
+        <span class="tag tag-b">serverless option</span>
+        <span class="tag tag-b">BI tool integration</span>
+        <span class="tag tag-a">minutes query latency</span>
+        <span class="tag tag-a">egress costs</span>
+      </div>
+      <div class="section-block">
+        <h4>Which one to pick</h4>
+        <div class="compare-grid">
+          <div class="compare-cell">
+            <h5 style="color:var(--accent5)">BigQuery</h5>
+            <p>Serverless — pay per TB queried ($5/TB). Best for irregular or unpredictable usage. Automatic scaling. Google ecosystem.</p>
+          </div>
+          <div class="compare-cell">
+            <h5 style="color:var(--accent5)">Redshift</h5>
+            <p>Best for sustained heavy analytics workloads. Provisioned clusters — predictable cost. Tight AWS integration (S3, Kinesis).</p>
+          </div>
+          <div class="compare-cell">
+            <h5 style="color:var(--accent5)">Snowflake</h5>
+            <p>Best for data sharing across orgs. Separate compute and storage. Multi-cloud. Most expensive at scale.</p>
+          </div>
+          <div class="compare-cell">
+            <h5 style="color:var(--accent2)">ClickHouse Cloud</h5>
+            <p>Best for real-time analytics where query latency matters. Sub-second vs minutes on the others. Less BI tool support.</p>
+          </div>
+        </div>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">BigQuery: scan 1TB</span><span class="metric-v warn">~$5, 10–60s</span></div>
+        <div class="metric-row"><span class="metric-k">Redshift dc2.8xlarge (2 nodes)</span><span class="metric-v info">~$5,000/month</span></div>
+        <div class="metric-row"><span class="metric-k">Snowflake X-Large warehouse</span><span class="metric-v info">~$12/hour when running</span></div>
+        <div class="metric-row"><span class="metric-k">Typical ETL cadence</span><span class="metric-v info">15min–1 hour refresh</span></div>
+      </div>
+      <div class="callout danger">Never run BI tools (Looker, Tableau, Metabase) directly against your production Postgres. A single badly-written dashboard query can lock rows and take down your application.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Elasticsearch -->
+    <div id="r-search" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(255,107,53,.1);color:var(--accent3)">ES</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent3)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent3)">Elasticsearch / OpenSearch</div>
+          <div class="result-tagline" style="color:var(--text2)">Full-text search, fuzzy matching, relevance ranking. Not a primary DB.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-a">full-text + fuzzy</span>
+        <span class="tag tag-a">relevance ranking</span>
+        <span class="tag tag-a">faceted filtering</span>
+        <span class="tag tag-r">not the source of truth</span>
+        <span class="tag tag-r">eventual consistency</span>
+        <span class="tag tag-r">complex ops</span>
+      </div>
+      <div class="section-block">
+        <h4>What to build</h4>
+        <p>Postgres remains the source of truth. Use Debezium (CDC) or an application-level dual-write to sync data to Elasticsearch. Write to Postgres first, sync to ES second. ES handles the search reads; Postgres handles everything else. OpenSearch is the AWS-managed fork — same API, no Elastic license fees.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">Elasticsearch search queries/s (per node)</span><span class="metric-v good">~5–10k searches/s</span></div>
+        <div class="metric-row"><span class="metric-k">Postgres FTS comparison</span><span class="metric-v warn">~200–500/s (no ranking)</span></div>
+        <div class="metric-row"><span class="metric-k">Index lag (near real-time)</span><span class="metric-v warn">~1–5s behind Postgres</span></div>
+        <div class="metric-row"><span class="metric-k">OpenSearch managed (r6g.large.search)</span><span class="metric-v info">~$150/month per node</span></div>
+        <div class="metric-row"><span class="metric-k">Storage overhead (inverted index)</span><span class="metric-v warn">~1.5–3× raw data size</span></div>
+      </div>
+      <div class="callout warn">Elasticsearch is an index, not a database. Never make it your source of truth. If your ES cluster goes down or gets out of sync, you must be able to rebuild it entirely from Postgres. If you can't, your architecture is wrong.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Kafka queue for bursts -->
+    <div id="r-queue" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.1);color:var(--accent)">KFK</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent)">Kafka / SQS write buffer + batching</div>
+          <div class="result-tagline" style="color:var(--text2)">Absorb any spike instantly. Drain at DB's max speed. Zero schema change.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-y">absorbs any spike</span>
+        <span class="tag tag-y">keep Postgres + SQL</span>
+        <span class="tag tag-y">adds ~100ms write latency</span>
+        <span class="tag tag-a">async: not immediately durable</span>
+        <span class="tag tag-r">need DLQ + monitoring</span>
+      </div>
+      <div class="section-block">
+        <h4>What to build</h4>
+        <p>Write to Kafka topic (sub-millisecond ACK). Consumer reads from topic in batches of 100–500 rows, bulk inserts to Postgres. DB sees steady batched load instead of spikes. For pre-warm: scale consumer count before known traffic events. For SQS: same pattern but simpler — SQS → Lambda → Postgres.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">Kafka producer ACK latency</span><span class="metric-v good">&lt;1ms (async)</span></div>
+        <div class="metric-row"><span class="metric-k">Kafka throughput (single partition)</span><span class="metric-v good">~100k msgs/s</span></div>
+        <div class="metric-row"><span class="metric-k">Batch insert (100 rows) vs 100 singles</span><span class="metric-v good">10–50× faster</span></div>
+        <div class="metric-row"><span class="metric-k">Consumer → Postgres drain rate</span><span class="metric-v good">~5–20k rows/s batched</span></div>
+        <div class="metric-row"><span class="metric-k">Write latency added (end-to-end)</span><span class="metric-v warn">50–500ms (async)</span></div>
+        <div class="metric-row"><span class="metric-k">Confluent Cloud cost (basic)</span><span class="metric-v info">~$0.11/GB throughput</span></div>
+      </div>
+      <div class="callout warn">Your writes are now asynchronous. A user submits a form, gets a 200 OK, but their data isn't in the DB yet. This breaks "refresh immediately" UX. Solutions: return the write ID immediately from the queue, use optimistic UI updates, or use synchronous writes for user-facing actions and async only for background events.</div>
+      <div class="section-block">
+        <h4>Consumer pattern</h4>
+        <div class="code-block"><span class="cm">// Consumer: drain Kafka → Postgres in batches</span>
+<span class="kw">const</span> BATCH_SIZE = <span class="num">500</span>;
+<span class="kw">const</span> FLUSH_INTERVAL = <span class="num">200</span>; <span class="cm">// ms</span>
+
+<span class="kw">async function</span> consumeAndFlush(consumer, db) {
+  <span class="kw">let</span> batch = [];
+  
+  <span class="kw">for await</span> (<span class="kw">const</span> msg <span class="kw">of</span> consumer) {
+    batch.push(JSON.parse(msg.value));
+    
+    <span class="kw">if</span> (batch.length >= BATCH_SIZE) {
+      <span class="kw">await</span> bulkInsert(db, batch);
+      <span class="kw">await</span> consumer.commitOffsets();
+      batch = [];
+    }
+  }
+}
+
+<span class="kw">async function</span> bulkInsert(db, rows) {
+  <span class="cm">// 500 rows → 1 INSERT → ~5ms vs 500 × 1ms = 500ms</span>
+  <span class="kw">const</span> values = rows.map(r => 
+    <span class="str">`('${r.id}', '${r.data}', NOW())`</span>
+  ).join(<span class="str">','</span>);
+  <span class="kw">await</span> db.query(
+    <span class="str">`INSERT INTO events (id, data, ts) VALUES ${values}
+     ON CONFLICT (id) DO NOTHING`</span>
+  );
+}</div>
+      </div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Postgres + batch writes -->
+    <div id="r-pg-batch" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(74,222,128,.1);color:var(--green)">PG</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended solution</div>
+          <div class="result-db" style="color:var(--green)">Postgres + Kafka buffer + batch inserts</div>
+          <div class="result-tagline" style="color:var(--text2)">Under 10k writes/s with ACID. Batching is your single biggest lever.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">keep full SQL + ACID</span>
+        <span class="tag tag-g">10–50× write throughput with batching</span>
+        <span class="tag tag-y">WAL is the ceiling</span>
+        <span class="tag tag-a">async latency on buffered path</span>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">100 single INSERTs</span><span class="metric-v warn">~20ms (20 rows/ms)</span></div>
+        <div class="metric-row"><span class="metric-k">1 batched INSERT, 100 rows</span><span class="metric-v good">~1ms (100 rows/ms)</span></div>
+        <div class="metric-row"><span class="metric-k">WAL ceiling (NVMe SSD)</span><span class="metric-v warn">~30–50k rows/s sustained</span></div>
+        <div class="metric-row"><span class="metric-k">COPY command (bulk load)</span><span class="metric-v good">~500k rows/s (no WAL)</span></div>
+        <div class="metric-row"><span class="metric-k">synchronous_commit = off</span><span class="metric-v warn">3–5× faster, risk data loss on crash</span></div>
+      </div>
+      <div class="callout info">COPY is the fastest write path in Postgres — bypasses WAL, streams directly. Use it for bulk imports. For real-time writes, batched INSERTs are the practical maximum.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Citus sharding -->
+    <div id="r-citus" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(251,191,36,.1);color:var(--amber)">CTX</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--amber)">Recommended solution</div>
+          <div class="result-db" style="color:var(--amber)">Citus — sharded Postgres</div>
+          <div class="result-tagline" style="color:var(--text2)">Keep SQL. Shard across nodes. Linear write AND read scaling.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">keep Postgres SQL</span>
+        <span class="tag tag-g">linear scaling with shard count</span>
+        <span class="tag tag-a">cross-shard JOINs are expensive</span>
+        <span class="tag tag-r">schema migrations on all shards</span>
+        <span class="tag tag-r">resharding is painful</span>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">8-shard Citus writes/s</span><span class="metric-v good">~80k rows/s aggregate</span></div>
+        <div class="metric-row"><span class="metric-k">Cross-shard JOIN overhead</span><span class="metric-v warn">5–10× single-node</span></div>
+        <div class="metric-row"><span class="metric-k">Same-shard JOIN speed</span><span class="metric-v good">Identical to single Postgres</span></div>
+        <div class="metric-row"><span class="metric-k">Distribution column query (no fan-out)</span><span class="metric-v good">~0.1ms routing overhead</span></div>
+        <div class="metric-row"><span class="metric-k">Without distribution column (full scan)</span><span class="metric-v warn">All shards queried in parallel</span></div>
+      </div>
+      <div class="callout warn">Choosing the distribution column is the most important decision. user_id is usually right — queries that include user_id hit exactly 1 shard. Queries without it fan out to all shards. Never choose a low-cardinality column (status, country) — all writes for that value go to the same shard.</div>
+      <div class="callout info">Alternative: CockroachDB or YugabyteDB give you distributed SQL with automatic sharding and rebalancing. More operational complexity but no manual shard management. CockroachDB handles ~10–50k writes/s per node and scales horizontally.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Cassandra/ScyllaDB -->
+    <div id="r-cassandra" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(167,139,250,.1);color:var(--accent4)">CQL</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent4)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent4)">Cassandra / ScyllaDB</div>
+          <div class="result-tagline" style="color:var(--text2)">1M+ writes/s on a modest cluster. Wide-column, LSM-tree, designed for this.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-p">1M+ writes/s</span>
+        <span class="tag tag-p">tunable consistency</span>
+        <span class="tag tag-p">no single point of failure</span>
+        <span class="tag tag-r">no JOINs</span>
+        <span class="tag tag-r">partition key design is everything</span>
+        <span class="tag tag-a">write amplification (10–30×)</span>
+      </div>
+      <div class="section-block">
+        <h4>ScyllaDB vs Cassandra — choose ScyllaDB for new projects</h4>
+        <p>ScyllaDB is a C++ rewrite of Cassandra. Same CQL query language and data model. 10× better throughput per node. Lower p99 latency. Better compaction strategies mean lower write amplification. Only reason to choose Cassandra: existing operational knowledge or 3rd party tooling that only supports Cassandra.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">ScyllaDB write throughput (per node)</span><span class="metric-v good">~500k–1M writes/s</span></div>
+        <div class="metric-row"><span class="metric-k">Cassandra write throughput (per node)</span><span class="metric-v good">~50–100k writes/s</span></div>
+        <div class="metric-row"><span class="metric-k">Write p99 latency (ScyllaDB)</span><span class="metric-v good">&lt;1ms</span></div>
+        <div class="metric-row"><span class="metric-k">LSM write amplification</span><span class="metric-v warn">10–30× (data written N× for compaction)</span></div>
+        <div class="metric-row"><span class="metric-k">Read on partition key (cached)</span><span class="metric-v good">&lt;1ms</span></div>
+        <div class="metric-row"><span class="metric-k">Read on non-partition key</span><span class="metric-v red">Full cluster scan — don't do this</span></div>
+        <div class="metric-row"><span class="metric-k">ScyllaDB Cloud (3-node i4i.4xlarge)</span><span class="metric-v info">~$3,000/month</span></div>
+      </div>
+      <div class="callout warn">Write amplification is real. A Cassandra/ScyllaDB write hits: memtable → commit log → multiple SSTables during compaction. Actual disk write I/O is 10–30× the logical data size. Factor this into storage provisioning.</div>
+      <div class="section-block">
+        <h4>Data model example — user activity feed</h4>
+        <div class="code-block"><span class="cm">-- Table: activity per user, ordered by time</span>
+<span class="kw">CREATE TABLE</span> user_activity (
+  user_id   uuid,
+  event_ts  timestamp,        <span class="cm">-- clustering key → sorted</span>
+  event_id  uuid,
+  action    text,
+  metadata  map&lt;text, text&gt;,
+  <span class="kw">PRIMARY KEY</span> (user_id, event_ts, event_id)
+) <span class="kw">WITH CLUSTERING ORDER BY</span> (event_ts <span class="kw">DESC</span>);
+
+<span class="cm">-- Fetch last 50 events for user: O(1), hits 1 partition</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> user_activity
+<span class="kw">WHERE</span> user_id = <span class="str">?</span>
+<span class="kw">LIMIT</span> <span class="num">50</span>;</div>
+      </div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- DynamoDB write -->
+    <div id="r-dynamo-write" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.1);color:var(--accent5)">DDB</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent5)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent5)">DynamoDB (on-demand mode)</div>
+          <div class="result-tagline" style="color:var(--text2)">Zero ops. Auto-scales writes and reads. Pay per operation.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-b">zero ops</span>
+        <span class="tag tag-b">infinite scale</span>
+        <span class="tag tag-b">single-digit ms writes</span>
+        <span class="tag tag-r">expensive at high sustained volume</span>
+        <span class="tag tag-r">rigid access patterns</span>
+        <span class="tag tag-a">GSI = extra cost per write</span>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">Write latency (p50)</span><span class="metric-v good">~1ms</span></div>
+        <div class="metric-row"><span class="metric-k">Write latency (p99)</span><span class="metric-v good">~5–10ms</span></div>
+        <div class="metric-row"><span class="metric-k">Cost per 1M writes (on-demand)</span><span class="metric-v warn">$1.25 per 1M WCU</span></div>
+        <div class="metric-row"><span class="metric-k">100M writes/day cost</span><span class="metric-v warn">~$125/day = $3,750/month</span></div>
+        <div class="metric-row"><span class="metric-k">ScyllaDB equivalent (10-node cluster)</span><span class="metric-v info">~$5,000/month but self-managed</span></div>
+        <div class="metric-row"><span class="metric-k">Crossover: DDB vs self-hosted</span><span class="metric-v warn">~100M–500M writes/day</span></div>
+      </div>
+      <div class="callout info">At very high sustained write volumes (&gt;500M writes/day), self-hosted ScyllaDB or Cassandra becomes cheaper than DynamoDB. The DynamoDB premium is ops simplicity — worth it until you're operating at true hyperscale.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- TimescaleDB -->
+    <div id="r-timeseries" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(0,255,200,.1);color:var(--accent2)">TSB</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent2)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent2)">TimescaleDB (or InfluxDB)</div>
+          <div class="result-tagline" style="color:var(--text2)">Time-series optimised. Auto-partitions by time. Full SQL if you choose Timescale.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-t">500k+ rows/s ingest</span>
+        <span class="tag tag-t">10–50× compression</span>
+        <span class="tag tag-t">automatic time partitioning</span>
+        <span class="tag tag-g">full SQL (TimescaleDB)</span>
+        <span class="tag tag-a">InfluxDB: Flux query language</span>
+      </div>
+      <div class="section-block">
+        <h4>TimescaleDB vs InfluxDB</h4>
+        <div class="compare-grid">
+          <div class="compare-cell">
+            <h5 style="color:var(--accent2)">TimescaleDB</h5>
+            <p>Postgres extension. Full SQL, same tooling, same wire protocol. Hypertables auto-partition by time. 10–100× faster than plain Postgres on time-series.</p>
+          </div>
+          <div class="compare-cell">
+            <h5 style="color:var(--accent2)">InfluxDB</h5>
+            <p>Purpose-built. 1M+ data points/s. Flux query language. No SQL. Best for pure metric storage with no relational joins needed at all.</p>
+          </div>
+        </div>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">TimescaleDB ingest rate</span><span class="metric-v good">~500k rows/s</span></div>
+        <div class="metric-row"><span class="metric-k">Storage compression (columnar)</span><span class="metric-v good">10–50× vs plain Postgres</span></div>
+        <div class="metric-row"><span class="metric-k">Range query on 1B rows (time range)</span><span class="metric-v good">~0.1–1s (hits 1 chunk)</span></div>
+        <div class="metric-row"><span class="metric-k">Continuous aggregate refresh latency</span><span class="metric-v info">configurable: 1s–1hr</span></div>
+        <div class="metric-row"><span class="metric-k">Timescale Cloud (8-core, 32GB)</span><span class="metric-v info">~$700/month</span></div>
+      </div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Full PG stack -->
+    <div id="r-pg-stack" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(74,222,128,.1);color:var(--green)">STK</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended solution</div>
+          <div class="result-db" style="color:var(--green)">The full Postgres stack</div>
+          <div class="result-tagline" style="color:var(--text2)">Postgres + Redis + read replicas + Kafka. Handles most scale before you need to change the DB.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">proven at massive scale</span>
+        <span class="tag tag-g">full SQL everywhere</span>
+        <span class="tag tag-g">one team can operate it</span>
+        <span class="tag tag-a">more moving parts than single DB</span>
+      </div>
+      <div class="section-block">
+        <h4>Stack components and their roles</h4>
+        <div class="metric-row"><span class="metric-k">Postgres primary</span><span class="metric-v info">All writes. Source of truth.</span></div>
+        <div class="metric-row"><span class="metric-k">2–3 read replicas</span><span class="metric-v info">All SELECT queries routed here.</span></div>
+        <div class="metric-row"><span class="metric-k">Redis cache</span><span class="metric-v info">Hot reads. 90%+ cache hit target.</span></div>
+        <div class="metric-row"><span class="metric-k">Kafka write buffer</span><span class="metric-v info">Absorb write spikes. Drain async.</span></div>
+        <div class="metric-row"><span class="metric-k">pgBouncer</span><span class="metric-v info">Connection pooling. Free throughput.</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers — this stack</h4>
+        <div class="metric-row"><span class="metric-k">Effective reads/s (90% cache hit)</span><span class="metric-v good">~500k reads/s</span></div>
+        <div class="metric-row"><span class="metric-k">Effective writes/s (with Kafka)</span><span class="metric-v good">~50k writes/s sustained</span></div>
+        <div class="metric-row"><span class="metric-k">Total estimated monthly cost (AWS)</span><span class="metric-v info">~$2,000–5,000</span></div>
+        <div class="metric-row"><span class="metric-k">Engineering complexity (1–10)</span><span class="metric-v warn">4/10 — manageable</span></div>
+      </div>
+      <div class="callout good">This is the right answer for 90% of companies at "scale." Instagram ran on Postgres for years. Shopify still runs substantially on MySQL. Migrate off Postgres only after you have genuinely exhausted this stack.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- DynamoDB mixed -->
+    <div id="r-dynamo-mixed" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.1);color:var(--accent5)">DDB</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent5)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent5)">DynamoDB + ElastiCache (DAX)</div>
+          <div class="result-tagline" style="color:var(--text2)">Both reads and writes at any scale. Design access patterns upfront.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-b">infinite scale both ways</span>
+        <span class="tag tag-b">zero ops</span>
+        <span class="tag tag-r">rigid access patterns</span>
+        <span class="tag tag-r">no ad-hoc queries</span>
+      </div>
+      <div class="section-block">
+        <h4>DynamoDB Accelerator (DAX)</h4>
+        <p>DAX is an in-process Cassandra-compatible cache that sits between your app and DynamoDB. Reads that hit DAX return in microseconds vs milliseconds for DynamoDB directly. No code changes — DAX is a drop-in replacement for the DynamoDB client. Best for extremely hot read keys.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">DynamoDB read p50</span><span class="metric-v good">~1ms</span></div>
+        <div class="metric-row"><span class="metric-k">DAX read p50</span><span class="metric-v good">&lt;100µs</span></div>
+        <div class="metric-row"><span class="metric-k">DAX cluster cost (dax.r4.large × 3)</span><span class="metric-v info">~$500/month</span></div>
+        <div class="metric-row"><span class="metric-k">DynamoDB Streams → Lambda fan-out</span><span class="metric-v info">~200ms end-to-end</span></div>
+      </div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- CQRS -->
+    <div id="r-cqrs" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(167,139,250,.1);color:var(--accent4)">CQS</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent4)">Recommended solution</div>
+          <div class="result-db" style="color:var(--accent4)">CQRS — separate write and read stores</div>
+          <div class="result-tagline" style="color:var(--text2)">Each store optimised independently. Complex but powerful for asymmetric loads.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-p">write store optimised for writes</span>
+        <span class="tag tag-p">read store optimised for reads</span>
+        <span class="tag tag-r">eventual consistency</span>
+        <span class="tag tag-r">significant complexity</span>
+        <span class="tag tag-r">consumer failure modes</span>
+      </div>
+      <div class="section-block">
+        <h4>Architecture</h4>
+        <p>Commands (writes) go to a fast append store — Kafka, EventStoreDB, or DynamoDB. An async consumer reads from the write store and builds one or more read models — a denormalised Postgres table, an Elasticsearch index, a Redis sorted set. Each read model is shaped exactly for one query pattern.</p>
+      </div>
+      <div class="section-block">
+        <h4>Real numbers</h4>
+        <div class="metric-row"><span class="metric-k">Write store (Kafka) throughput</span><span class="metric-v good">~1M events/s</span></div>
+        <div class="metric-row"><span class="metric-k">Read model build lag</span><span class="metric-v warn">100ms–5s behind writes</span></div>
+        <div class="metric-row"><span class="metric-k">Read model query speed</span><span class="metric-v good">Sub-ms (optimised for exact query)</span></div>
+        <div class="metric-row"><span class="metric-k">Engineering complexity (1–10)</span><span class="metric-v red">8/10 — only when necessary</span></div>
+      </div>
+      <div class="callout danger">Only adopt CQRS when simpler architectures are genuinely exhausted. The eventual consistency between write and read models creates subtle bugs that are hard to detect and harder to fix in production. Start with the full Postgres stack first.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="right-panel">
+    <div class="rp-section">
+      <div class="rp-label">Database reference</div>
+      <div id="db-cards">
+        <div class="db-card" id="dbc-pg">
+          <div class="db-card-name">Postgres</div>
+          <div class="db-card-meta">OLTP, relational, ACID. The default choice.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">50k reads/s</span>
+            <span class="db-stat">5–8k writes/s</span>
+          </div>
+        </div>
+        <div class="db-card" id="dbc-redis">
+          <div class="db-card-name">Redis</div>
+          <div class="db-card-meta">In-memory key-value. Cache + primary store.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">500k ops/s</span>
+            <span class="db-stat">&lt;1ms p99</span>
+          </div>
+        </div>
+        <div class="db-card" id="dbc-dynamo">
+          <div class="db-card-name">DynamoDB</div>
+          <div class="db-card-meta">Managed key-value + wide-column. AWS.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">unlimited scale</span>
+            <span class="db-stat">1–3ms</span>
+          </div>
+        </div>
+        <div class="db-card" id="dbc-cassandra">
+          <div class="db-card-name">Cassandra / ScyllaDB</div>
+          <div class="db-card-meta">Wide-column, LSM-tree. Write-optimised.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">1M+ writes/s</span>
+            <span class="db-stat">CQL</span>
+          </div>
+        </div>
+        <div class="db-card" id="dbc-clickhouse">
+          <div class="db-card-name">ClickHouse</div>
+          <div class="db-card-meta">Columnar OLAP. Real-time analytics.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">1B rows/0.1s</span>
+            <span class="db-stat">10× compress</span>
+          </div>
+        </div>
+        <div class="db-card" id="dbc-elastic">
+          <div class="db-card-name">Elasticsearch</div>
+          <div class="db-card-meta">Inverted index. Full-text + fuzzy search.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">10k searches/s</span>
+            <span class="db-stat">~1–5s lag</span>
+          </div>
+        </div>
+        <div class="db-card" id="dbc-timescale">
+          <div class="db-card-name">TimescaleDB</div>
+          <div class="db-card-meta">Postgres extension. Time-series native.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">500k rows/s</span>
+            <span class="db-stat">50× compress</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="rp-section">
+      <div class="rp-label">Golden rules</div>
+      <div class="rule-item"><span class="rule-num">01</span><span>Exhaust Postgres before migrating. Most "scaling problems" are missing indexes.</span></div>
+      <div class="rule-item"><span class="rule-num">02</span><span>Never run analytics queries on your OLTP primary.</span></div>
+      <div class="rule-item"><span class="rule-num">03</span><span>Redis cache solves most read problems in a day. DynamoDB migration takes weeks.</span></div>
+      <div class="rule-item"><span class="rule-num">04</span><span>Add a write queue (Kafka/SQS) before sharding. It buys time.</span></div>
+      <div class="rule-item"><span class="rule-num">05</span><span>Batch inserts: 100 rows in 1 INSERT is 10–50× faster than 100 individual inserts.</span></div>
+      <div class="rule-item"><span class="rule-num">06</span><span>Never make Elasticsearch your source of truth. It's an index.</span></div>
+      <div class="rule-item"><span class="rule-num">07</span><span>Design DynamoDB access patterns before the schema — not after.</span></div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+const history = [];
+const stateLabels = {
+  'q0':'Start','q1-read':'Read path','q1-write':'Write path','q1-both':'Mixed load',
+  'q2-simple':'Key lookups','q2-relational':'Relational','q2-analytics':'Analytics',
+  'q2-write-volume':'Sustained writes','q3-write-vol':'Need SQL?','q3-write-shape':'Data shape',
+  'r-cache':'Redis + Replica','r-redis-dedicated':'Redis primary','r-dynamo':'DynamoDB reads',
+  'r-replica-1':'1 Replica','r-replica-many':'Multi-replica','r-citus-read':'Citus',
+  'r-clickhouse':'ClickHouse','r-warehouse':'Data warehouse','r-search':'Elasticsearch',
+  'r-queue':'Kafka buffer','r-pg-batch':'Batched writes','r-citus':'Citus sharding',
+  'r-cassandra':'ScyllaDB','r-dynamo-write':'DynamoDB writes','r-timeseries':'TimescaleDB',
+  'r-pg-stack':'Full PG stack','r-dynamo-mixed':'DynamoDB mixed','r-cqrs':'CQRS'
+};
+const resultHighlights = {
+  'r-cache':'dbc-redis','r-redis-dedicated':'dbc-redis','r-dynamo':'dbc-dynamo',
+  'r-replica-1':'dbc-pg','r-replica-many':'dbc-pg','r-citus-read':'dbc-pg',
+  'r-clickhouse':'dbc-clickhouse','r-warehouse':null,'r-search':'dbc-elastic',
+  'r-queue':'dbc-pg','r-pg-batch':'dbc-pg','r-citus':'dbc-pg',
+  'r-cassandra':'dbc-cassandra','r-dynamo-write':'dbc-dynamo','r-timeseries':'dbc-timescale',
+  'r-pg-stack':'dbc-pg','r-dynamo-mixed':'dbc-dynamo','r-cqrs':null
+};
+const totalDepth = 4;
+
+function go(nextId, label) {
+  const cur = document.querySelector('.state.on');
+  history.push({ id: cur.id, label });
+  cur.classList.remove('on');
+  document.getElementById(nextId).classList.add('on');
+  updateUI(nextId);
+}
+
+function goBack() {
+  if (!history.length) return;
+  const prev = history.pop();
+  document.querySelector('.state.on').classList.remove('on');
+  document.getElementById(prev.id).classList.add('on');
+  updateUI(prev.id);
+}
+
+function restart() {
+  history.length = 0;
+  document.querySelector('.state.on').classList.remove('on');
+  document.getElementById('q0').classList.add('on');
+  updateUI('q0');
+}
+
+function updateUI(currentId) {
+  // Breadcrumb
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = history.map((h, i) =>
+    `<span class="bc-item">${h.label}</span>${i < history.length - 1 ? '<span class="bc-sep">›</span>' : ''}`
+  ).join('');
+
+  // Progress
+  const fill = document.getElementById('progress-fill');
+  const label = document.getElementById('step-label');
+  const depth = history.length;
+  const pct = Math.min(100, (depth / totalDepth) * 100);
+  fill.style.width = pct + '%';
+  label.textContent = `step ${depth}`;
+
+  // Highlight result DB
+  document.querySelectorAll('.db-card').forEach(c => c.classList.remove('highlight'));
+  const hlId = resultHighlights[currentId];
+  if (hlId) {
+    const el = document.getElementById(hlId);
+    if (el) el.classList.add('highlight');
+  }
+
+  // Tree nav
+  const treeNav = document.getElementById('tree-nav');
+  const navItems = [...history.map(h => h.id), currentId];
+  treeNav.innerHTML = navItems.map((id, i) => {
+    const isCurrent = i === navItems.length - 1;
+    const label = stateLabels[id] || id;
+    return `<div class="tree-item ${isCurrent ? 'current' : 'visited'}">
+      <div class="tree-dot"></div>${label}</div>`;
+  }).join('');
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Backspace' || e.key === 'ArrowLeft') { goBack(); return; }
+  const n = parseInt(e.key);
+  if (n >= 1 && n <= 4) {
+    const cur = document.querySelector('.state.on');
+    const opts = cur.querySelectorAll('.opt');
+    if (opts[n - 1]) opts[n - 1].click();
+  }
+});
+
+updateUI('q0');
+</script>
+</body>
+</html>
