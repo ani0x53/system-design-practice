@@ -778,7 +778,7 @@
       <div class="meta-chip"><div class="dot" style="background:var(--green)"></div> Decoupling</div>
       <div class="meta-chip"><div class="dot" style="background:var(--amber)"></div> Fan-out / Fan-in</div>
       <div class="meta-chip"><div class="dot" style="background:var(--accent4)"></div> Event streaming</div>
-      <div class="meta-chip">14 decision paths</div>
+      <div class="meta-chip">16 decision paths</div>
     </div>
   </div>
   <div class="header-right">
@@ -1131,15 +1131,15 @@
     <!-- ═══════════════════════════════════ -->
 
     <div id="q1-buffer" class="state">
-      <div class="q-step">Buffering → step 1 of 2</div>
+      <div class="q-step">Buffering → step 1 of 3</div>
       <div class="q-title">What's the downstream bottleneck?</div>
       <div class="q-subtitle">The thing you're protecting determines the buffering strategy. A database handles backpressure differently than a third-party API with rate limits.</div>
       <div class="options">
-        <div class="opt" onclick="go('r-kafka-buffer','Database — smooth write spikes')">
+        <div class="opt" onclick="go('q2-write-heavy','Database — write-heavy')">
           <span class="opt-key">1</span>
           <div class="opt-body">
-            <div class="opt-title">Database — absorb write spikes</div>
-            <div class="opt-sub">Your Postgres/MySQL can handle 5k writes/s sustained but peaks hit 50k/s. Need a buffer to absorb spikes and drain at a steady rate.</div>
+            <div class="opt-title">Database — write-heavy, can't drop requests</div>
+            <div class="opt-sub">Your Postgres/MySQL can't keep up with write volume. You need a buffer to absorb spikes and guarantee every write eventually lands in the DB.</div>
             <div class="opt-numbers">Kafka → batch consumer → DB: smooth 10:1 peak-to-baseline ratio</div>
           </div>
         </div>
@@ -1163,6 +1163,182 @@
       <div class="nav-actions">
         <button class="btn" onclick="goBack()">Back</button>
         <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- WRITE-HEAVY DB BRANCH              -->
+    <!-- ═══════════════════════════════════ -->
+
+    <div id="q2-write-heavy" class="state">
+      <div class="q-step">Buffering → Write-heavy → step 2 of 3</div>
+      <div class="q-title">Can you afford to lose any writes?</div>
+      <div class="q-subtitle">This determines how much machinery you need. "Smoothing spikes" is a different problem than "guaranteed zero-drop writes under any failure scenario."</div>
+      <div class="options">
+        <div class="opt" onclick="go('q3-zero-drop','Zero data loss')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Zero data loss — every write must land in the DB</div>
+            <div class="opt-sub">Financial transactions, order placements, audit events. If the app accepted the request, it MUST eventually be written. Losing a write means losing money or breaking compliance.</div>
+            <div class="opt-numbers">Requires: acks=all, idempotent producer, transactional outbox or Kafka transactions</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-kafka-buffer','Best-effort durability is fine')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Best-effort — smooth spikes, some loss on catastrophic failure OK</div>
+            <div class="opt-sub">Analytics events, clickstream, metrics, logs. Losing a few events during a broker crash is acceptable. Optimize for throughput and simplicity.</div>
+            <div class="opt-numbers">Simpler setup: acks=1, no outbox pattern, just Kafka as a buffer</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <div id="q3-zero-drop" class="state">
+      <div class="q-step">Buffering → Zero-drop → step 3 of 3</div>
+      <div class="q-title">Where does the write originate?</div>
+      <div class="q-subtitle">The guarantee strategy depends on whether the write starts in your application code (API request) or is already committed to a database (sync from DB to downstream).</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-outbox-kafka','API request → must reach DB')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">API request — app receives request, must guarantee DB write</div>
+            <div class="opt-sub">User places an order via API. You need to acknowledge it, buffer it through Kafka, and guarantee it reaches the database. The hard part: what if Kafka publish fails after you've already responded 200?</div>
+            <div class="opt-numbers">Transactional outbox pattern: write to DB + outbox in one transaction</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-kafka-cdc','DB change → must reach downstream')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">DB change — data is in DB, must propagate to other systems</div>
+            <div class="opt-sub">Data is already safely in your primary DB. You need to reliably stream changes to Elasticsearch, cache, warehouse, or other services without dual-write bugs.</div>
+            <div class="opt-numbers">CDC (Debezium): reads the WAL, zero data loss, no app code changes</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- Transactional Outbox + Kafka -->
+    <div id="r-outbox-kafka" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(74,222,128,.15); color:var(--green);">OUT</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Transactional Outbox + Kafka</div>
+          <div class="result-tagline" style="color:var(--text2)">Zero-drop writes: DB transaction guarantees the event reaches Kafka</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">zero data loss</span>
+        <span class="tag tag-y">transactional outbox</span>
+        <span class="tag tag-t">exactly-once to DB</span>
+        <span class="tag tag-b">idempotent consumer</span>
+      </div>
+
+      <div class="section-block">
+        <h4>The problem</h4>
+        <p>Your API receives a write request. You need to: (1) acknowledge it to the user, (2) buffer it in Kafka, and (3) guarantee it eventually reaches the database. The naive approach — publish to Kafka, then write to DB — fails because either step can crash independently. You get ghost writes (in Kafka but not DB) or lost events (in DB but not Kafka). This is the <strong>dual-write problem</strong>.</p>
+      </div>
+
+      <div class="section-block">
+        <h4>The solution: Transactional Outbox</h4>
+        <p>Instead of publishing to Kafka directly, write both the business data AND the event to the same database in a single ACID transaction. A separate process (the "relay") polls the outbox table and publishes events to Kafka. Since the business write and the event are in the same transaction, they either both commit or both rollback. The relay is idempotent — if it crashes, it retries from the last published offset. Zero data loss.</p>
+      </div>
+
+      <div class="section-block">
+        <h4>Architecture</h4>
+        <div class="code-block"><span class="cm">// ✗ WRONG: dual-write (either can fail independently)</span>
+<span class="kw">API</span> → publish to <span class="kw">Kafka</span>    <span class="cm">// what if this succeeds...</span>
+    → write to <span class="kw">Postgres</span>   <span class="cm">// ...but this fails? ghost event in Kafka</span>
+
+<span class="cm">// ✓ CORRECT: transactional outbox</span>
+<span class="kw">API</span> → <span class="str">BEGIN TRANSACTION</span>
+       INSERT INTO <span class="str">orders</span> (...)          <span class="cm">// business data</span>
+       INSERT INTO <span class="str">outbox</span> (topic, key, payload)  <span class="cm">// event</span>
+     <span class="str">COMMIT</span>                              <span class="cm">// atomic — both or neither</span>
+
+<span class="kw">Relay</span> (polling or CDC) → reads <span class="str">outbox</span> table → publishes to <span class="kw">Kafka</span>
+                        → deletes processed rows
+
+<span class="kw">Kafka</span> → <span class="kw">Batch consumer</span> (idempotent) → <span class="kw">downstream systems</span></div>
+      </div>
+
+      <div class="section-block">
+        <h4>Outbox table schema</h4>
+        <div class="code-block"><span class="kw">CREATE TABLE</span> outbox (
+  id          BIGSERIAL <span class="kw">PRIMARY KEY</span>,
+  topic       TEXT <span class="kw">NOT NULL</span>,           <span class="cm">-- Kafka topic name</span>
+  key         TEXT,                    <span class="cm">-- partition key (e.g. order_id)</span>
+  payload     JSONB <span class="kw">NOT NULL</span>,         <span class="cm">-- event data</span>
+  created_at  TIMESTAMPTZ <span class="kw">DEFAULT NOW</span>(),
+  published   BOOLEAN <span class="kw">DEFAULT FALSE</span>    <span class="cm">-- relay marks true after publish</span>
+);
+
+<span class="cm">-- Index for the relay to poll efficiently</span>
+<span class="kw">CREATE INDEX</span> idx_outbox_unpublished
+  <span class="kw">ON</span> outbox (id) <span class="kw">WHERE</span> published = <span class="kw">FALSE</span>;</div>
+      </div>
+
+      <div class="section-block">
+        <h4>Relay options</h4>
+        <div class="metric-row"><span class="metric-k">Polling relay</span><span class="metric-v info">SELECT from outbox WHERE published=false</span></div>
+        <div class="metric-row"><span class="metric-k">CDC relay (Debezium)</span><span class="metric-v good">reads outbox via WAL — no polling</span></div>
+        <div class="metric-row"><span class="metric-k">Polling interval</span><span class="metric-v info">100ms–1s typical</span></div>
+        <div class="metric-row"><span class="metric-k">Throughput</span><span class="metric-v good">10k–50k events/s (CDC relay)</span></div>
+      </div>
+
+      <div class="callout good">Debezium can read the outbox table via CDC — this eliminates polling entirely. Debezium reads the WAL, captures outbox inserts, and publishes to Kafka. This is called the "outbox + CDC" pattern and is the most robust option.</div>
+
+      <div class="section-block">
+        <h4>Kafka producer settings for zero data loss</h4>
+        <div class="metric-row"><span class="metric-k">acks</span><span class="metric-v good">all (wait for all replicas)</span></div>
+        <div class="metric-row"><span class="metric-k">enable.idempotence</span><span class="metric-v good">true (dedup retries)</span></div>
+        <div class="metric-row"><span class="metric-k">min.insync.replicas</span><span class="metric-v good">2 (survive 1 broker loss)</span></div>
+        <div class="metric-row"><span class="metric-k">retries</span><span class="metric-v info">MAX_INT (retry forever)</span></div>
+        <div class="metric-row"><span class="metric-k">max.in.flight.requests</span><span class="metric-v info">5 (safe with idempotence)</span></div>
+      </div>
+
+      <div class="section-block">
+        <h4>Consumer side: idempotent writes to DB</h4>
+        <div class="code-block"><span class="cm">// Consumer must be idempotent — messages CAN be delivered &gt;1 time</span>
+<span class="cm">// Option 1: Upsert with natural key</span>
+INSERT INTO orders (order_id, ...) VALUES (...)
+  <span class="kw">ON CONFLICT</span> (order_id) <span class="kw">DO NOTHING</span>;
+
+<span class="cm">// Option 2: Dedup table</span>
+INSERT INTO processed_events (event_id) VALUES (<span class="str">'evt-789'</span>)
+  <span class="kw">ON CONFLICT DO NOTHING</span>;  <span class="cm">-- if this fails, skip the event</span>
+
+<span class="cm">// Option 3: Consumer offset in same DB transaction</span>
+<span class="str">BEGIN</span>
+  INSERT INTO orders (...);
+  UPDATE consumer_offsets SET offset = <span class="num">12345</span> WHERE partition = <span class="num">3</span>;
+<span class="str">COMMIT</span>  <span class="cm">// exactly-once: process + offset commit are atomic</span></div>
+      </div>
+
+      <div class="callout danger">The outbox table will grow forever if you don't clean it up. Delete or archive published rows on a schedule. A common pattern: keep 24h of published events, delete older rows in batches during off-peak hours.</div>
+
+      <div class="callout warn">Ordering guarantee: the outbox relay publishes events in outbox ID order. But if you have multiple relay instances, you need to partition by key to maintain per-entity ordering in Kafka.</div>
+
+      <div class="section-block">
+        <h4>When NOT to use the outbox pattern</h4>
+        <p>If your write doesn't need a database transaction (pure event append), skip the outbox — just use Kafka directly with acks=all and idempotent producer. The outbox exists specifically for the case where you need atomicity between a DB write and an event publish. Don't pay the complexity cost if you don't have the dual-write problem.</p>
+      </div>
+
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: buffering → write-heavy → zero-drop → API request</span>
       </div>
     </div>
 
@@ -2088,17 +2264,17 @@ const stateLabels = {
   'q0':'Start',
   'q1-decouple':'Decoupling','q1-fanout':'Fan-out','q1-stream':'Event streaming','q1-buffer':'Buffering',
   'q2-managed':'Managed','q2-selfhost':'Self-hosted','q2-fanout-pull':'Pull-based','q2-fanout-push':'Push-based',
-  'q2-event-source':'Event sourcing',
+  'q2-event-source':'Event sourcing','q2-write-heavy':'Write-heavy','q3-zero-drop':'Zero-drop',
   'r-sqs-std':'SQS Standard','r-sqs-fifo':'SQS FIFO','r-rabbit':'RabbitMQ','r-redis-stream':'Redis Streams',
   'r-kafka':'Kafka','r-kafka-streams':'Kafka Streams','r-sns-sqs':'SNS+SQS','r-rabbit-fanout':'RabbitMQ Fanout',
   'r-kafka-cdc':'Debezium+Kafka','r-eventstore':'EventStoreDB','r-kafka-es':'Kafka ES','r-kafka-connect':'Kafka Bus',
-  'r-kafka-buffer':'Kafka Buffer','r-sqs-buffer':'SQS Buffer','r-leaky-bucket':'Backpressure'
+  'r-outbox-kafka':'Outbox+Kafka','r-kafka-buffer':'Kafka Buffer','r-sqs-buffer':'SQS Buffer','r-leaky-bucket':'Backpressure'
 };
 const resultHighlights = {
   'r-sqs-std':'dbc-sqs','r-sqs-fifo':'dbc-sqs','r-rabbit':'dbc-rabbit','r-redis-stream':'dbc-redis',
   'r-kafka':'dbc-kafka','r-kafka-streams':'dbc-flink','r-sns-sqs':'dbc-sns','r-rabbit-fanout':'dbc-rabbit',
   'r-kafka-cdc':'dbc-kafka','r-eventstore':'dbc-eventstore','r-kafka-es':'dbc-kafka','r-kafka-connect':'dbc-kafka',
-  'r-kafka-buffer':'dbc-kafka','r-sqs-buffer':'dbc-sqs','r-leaky-bucket':null
+  'r-outbox-kafka':'dbc-kafka','r-kafka-buffer':'dbc-kafka','r-sqs-buffer':'dbc-sqs','r-leaky-bucket':null
 };
 const totalDepth = 4;
 
