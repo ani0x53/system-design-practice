@@ -1,0 +1,2171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Message Queues — System Design Decision Tree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #111111;
+    --bg3: #181818;
+    --bg4: #1f1f1f;
+    --border: #2a2a2a;
+    --border2: #333;
+    --text: #e8e8e8;
+    --text2: #999;
+    --text3: #666;
+    --accent: #e8ff00;
+    --accent2: #00ffc8;
+    --accent3: #ff6b35;
+    --accent4: #a78bfa;
+    --accent5: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 24px 32px 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .header-left {}
+  .site-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .site-label a {
+    color: var(--text3);
+    text-decoration: none;
+    transition: color .15s;
+  }
+  .site-label a:hover { color: var(--text2); }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -.02em;
+    line-height: 1.2;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .header-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .meta-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    border: 1px solid var(--border2);
+    padding: 3px 8px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .meta-chip .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .progress-track {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .progress-bar {
+    width: 120px;
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width .4s ease;
+    width: 0%;
+  }
+
+  .breadcrumb {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    max-width: 380px;
+    justify-content: flex-end;
+  }
+
+  .bc-item { color: var(--text2); }
+  .bc-sep { color: var(--text3); opacity: .5; }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 280px;
+    min-height: calc(100vh - 89px);
+  }
+
+  /* ── LEFT SIDEBAR ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 89px);
+  }
+
+  .sidebar-section {
+    padding: 0 20px;
+    margin-bottom: 24px;
+  }
+
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .tree-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12px;
+    color: var(--text3);
+    cursor: pointer;
+    transition: color .15s;
+    font-family: var(--mono);
+  }
+
+  .tree-item:hover { color: var(--text2); }
+  .tree-item.visited { color: var(--text2); }
+  .tree-item.current { color: var(--accent); }
+
+  .tree-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--border2);
+    flex-shrink: 0;
+    transition: all .15s;
+  }
+
+  .tree-item.visited .tree-dot { background: var(--text3); border-color: var(--text3); }
+  .tree-item.current .tree-dot { background: var(--accent); border-color: var(--accent); }
+
+  .numbers-ref {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 0 20px 20px;
+  }
+
+  .num-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .num-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+
+  .num-row:last-child { border-bottom: none; }
+
+  .num-k {
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  .num-v {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .num-v.green { color: var(--green); }
+  .num-v.amber { color: var(--amber); }
+  .num-v.red { color: var(--red); }
+
+  /* ── MAIN ── */
+  .main {
+    padding: 32px 36px;
+    max-width: 780px;
+  }
+
+  /* STATE */
+  .state { display: none; }
+  .state.on { display: block; animation: fadeIn .2s ease; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* QUESTION */
+  .q-step {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .q-title {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+
+  .q-subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-bottom: 28px;
+    max-width: 560px;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .opt {
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all .15s;
+    background: var(--bg2);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .opt::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: background .15s;
+  }
+
+  .opt:hover {
+    border-color: var(--border2);
+    background: var(--bg3);
+  }
+
+  .opt:hover::before { background: var(--accent); }
+
+  .opt-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    border: 1px solid var(--border2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    min-width: 24px;
+    text-align: center;
+    transition: all .15s;
+  }
+
+  .opt:hover .opt-key {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .opt-body {}
+
+  .opt-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .opt-sub {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .opt-numbers {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 5px;
+  }
+
+  /* RESULT */
+  .result-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .result-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .result-title-wrap {}
+
+  .result-verdict {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .result-db {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .result-tagline {
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: .02em;
+  }
+
+  .tag-g { background: rgba(74,222,128,.12); color: var(--green); border: 1px solid rgba(74,222,128,.25); }
+  .tag-r { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.25); }
+  .tag-a { background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.25); }
+  .tag-b { background: rgba(56,189,248,.12); color: var(--accent5); border: 1px solid rgba(56,189,248,.25); }
+  .tag-p { background: rgba(167,139,250,.12); color: var(--accent4); border: 1px solid rgba(167,139,250,.25); }
+  .tag-y { background: rgba(232,255,0,.12); color: var(--accent); border: 1px solid rgba(232,255,0,.25); }
+  .tag-t { background: rgba(0,255,200,.12); color: var(--accent2); border: 1px solid rgba(0,255,200,.25); }
+
+  .section-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+
+  .section-block h4 {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .section-block p {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.65;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    gap: 12px;
+  }
+
+  .metric-row:last-child { border-bottom: none; }
+
+  .metric-k {
+    color: var(--text2);
+    flex: 1;
+  }
+
+  .metric-v {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  .metric-v.good { color: var(--green); }
+  .metric-v.warn { color: var(--amber); }
+  .metric-v.bad { color: var(--red); }
+  .metric-v.info { color: var(--accent5); }
+  .metric-v.acc { color: var(--accent); }
+
+  .callout {
+    border-left: 2px solid;
+    padding: 10px 12px;
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .callout.warn {
+    border-color: var(--amber);
+    background: rgba(251,191,36,.06);
+    color: var(--amber);
+  }
+
+  .callout.good {
+    border-color: var(--green);
+    background: rgba(74,222,128,.06);
+    color: #86efac;
+  }
+
+  .callout.info {
+    border-color: var(--accent5);
+    background: rgba(56,189,248,.06);
+    color: #7dd3fc;
+  }
+
+  .callout.danger {
+    border-color: var(--red);
+    background: rgba(248,113,113,.06);
+    color: #fca5a5;
+  }
+
+  .code-block {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 12px 14px;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-top: 8px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .code-block .kw { color: var(--accent4); }
+  .code-block .str { color: var(--accent2); }
+  .code-block .num { color: var(--accent); }
+  .code-block .cm { color: var(--text3); }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .compare-cell {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    background: var(--bg2);
+  }
+
+  .compare-cell h5 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .compare-cell p {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  /* BACK / RESET */
+  .nav-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: .02em;
+  }
+
+  .btn:hover {
+    border-color: var(--text3);
+    color: var(--text2);
+  }
+
+  .btn-primary {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-primary:hover {
+    background: var(--accent);
+    color: #000;
+  }
+
+  /* ── RIGHT PANEL ── */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    padding: 24px 20px;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 89px);
+  }
+
+  .rp-section {
+    margin-bottom: 24px;
+  }
+
+  .rp-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .db-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: var(--bg2);
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .db-card:hover { border-color: var(--border2); background: var(--bg3); }
+  .db-card.highlight { border-color: var(--accent); }
+
+  .db-card-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .db-card.highlight .db-card-name { color: var(--accent); }
+
+  .db-card-meta {
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.4;
+  }
+
+  .db-card-stats {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .db-stat {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    background: var(--bg3);
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+  }
+
+  .rule-item {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+    display: flex;
+    gap: 8px;
+  }
+
+  .rule-item:last-child { border-bottom: none; }
+
+  .rule-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── INTRO ── */
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .intro-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    background: var(--bg2);
+  }
+
+  .intro-card-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .intro-card p {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .big-number {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar, .right-panel { display: none; }
+    .main { max-width: 100%; padding: 24px 20px; }
+  }
+
+  /* Keyboard hint */
+  .kbd-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .kbd {
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 9px;
+    color: var(--text3);
+  }
+
+  /* Footer */
+  .result-footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="site-label"><a href="index.html">System Design Practice</a></div>
+    <h1>Message Queues — <span>Decision Tree</span></h1>
+    <div class="header-meta">
+      <div class="meta-chip"><div class="dot" style="background:var(--green)"></div> Decoupling</div>
+      <div class="meta-chip"><div class="dot" style="background:var(--amber)"></div> Fan-out / Fan-in</div>
+      <div class="meta-chip"><div class="dot" style="background:var(--accent4)"></div> Event streaming</div>
+      <div class="meta-chip">14 decision paths</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="progress-track">
+      <span id="step-label">step 0</span>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Throughput reference</div>
+      <div class="numbers-ref">
+        <div class="num-title">Messages / second (single node)</div>
+        <div class="num-row"><span class="num-k">Kafka</span><span class="num-v green">~1M/s</span></div>
+        <div class="num-row"><span class="num-k">Redpanda</span><span class="num-v green">~1M/s</span></div>
+        <div class="num-row"><span class="num-k">RabbitMQ</span><span class="num-v amber">~30k/s</span></div>
+        <div class="num-row"><span class="num-k">SQS</span><span class="num-v amber">~3k/s std</span></div>
+        <div class="num-row"><span class="num-k">Redis Streams</span><span class="num-v green">~500k/s</span></div>
+      </div>
+      <div class="numbers-ref">
+        <div class="num-title">Latency (p99 publish)</div>
+        <div class="num-row"><span class="num-k">Kafka (acks=1)</span><span class="num-v green">~2ms</span></div>
+        <div class="num-row"><span class="num-k">Kafka (acks=all)</span><span class="num-v amber">~5–15ms</span></div>
+        <div class="num-row"><span class="num-k">RabbitMQ</span><span class="num-v green">&lt;1ms</span></div>
+        <div class="num-row"><span class="num-k">SQS</span><span class="num-v amber">~20–50ms</span></div>
+        <div class="num-row"><span class="num-k">SNS+SQS fan-out</span><span class="num-v amber">~50–100ms</span></div>
+      </div>
+      <div class="numbers-ref">
+        <div class="num-title">Retention / storage</div>
+        <div class="num-row"><span class="num-k">Kafka</span><span class="num-v green">days–forever</span></div>
+        <div class="num-row"><span class="num-k">RabbitMQ</span><span class="num-v red">until consumed</span></div>
+        <div class="num-row"><span class="num-k">SQS</span><span class="num-v amber">14 days max</span></div>
+        <div class="num-row"><span class="num-k">Redis Streams</span><span class="num-v amber">memory-bound</span></div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navigation</div>
+      <div id="tree-nav"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- ══ ROOT ══ -->
+    <div id="q0" class="state on">
+      <div class="q-step">Starting point</div>
+      <div class="q-title">Why do you need async messaging?</div>
+      <div class="q-subtitle">The core reason you're reaching for a queue determines which tool fits. Don't pick Kafka because it's popular — pick it because your problem needs a distributed commit log.</div>
+
+      <div class="intro-grid">
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--green)">Signs you need a queue</div>
+          <p>Producer is faster than consumer. Downstream services go down and you lose work. Synchronous calls create cascading failures. You need to process the same event in multiple services.</p>
+        </div>
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--amber)">Signs you might NOT</div>
+          <p>You need a response from the downstream service. Total latency under 50ms matters. You have &lt;100 events/s and no reliability needs. You're adding a queue "just in case".</p>
+        </div>
+      </div>
+
+      <div class="kbd-hint"><kbd class="kbd">click</kbd> an option or press <kbd class="kbd">1</kbd> <kbd class="kbd">2</kbd> <kbd class="kbd">3</kbd> <kbd class="kbd">4</kbd></div>
+
+      <div class="options" id="opts-q0">
+        <div class="opt" onclick="go('q1-decouple','Decoupling')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Decoupling — fire-and-forget work</div>
+            <div class="opt-sub">Send emails, resize images, charge payments — work that doesn't need to block the request. Producer shouldn't know or care about consumer speed.</div>
+            <div class="opt-numbers">Classic pattern: web request → queue → worker pool</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-fanout','Fan-out')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Fan-out — one event, many consumers</div>
+            <div class="opt-sub">A single event (user signup, order placed) needs to trigger actions in 3+ independent services. Each consumer processes independently.</div>
+            <div class="opt-numbers">E.g. order_placed → inventory, billing, notifications, analytics</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-stream','Event streaming / log')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Event streaming — ordered, replayable log</div>
+            <div class="opt-sub">You need to replay events, build materialized views, do CDC, or maintain strict ordering per entity. Events are facts, not tasks.</div>
+            <div class="opt-numbers">Think: event sourcing, change data capture, stream processing</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-buffer','Rate limiting / buffering')">
+          <span class="opt-key">4</span>
+          <div class="opt-body">
+            <div class="opt-title">Buffering — absorb traffic spikes</div>
+            <div class="opt-sub">Your downstream (DB, API, payment gateway) can't handle peak load. You need to smooth writes and protect fragile backends.</div>
+            <div class="opt-numbers">Pattern: queue as shock absorber between bursty producers &amp; fixed-capacity consumers</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- DECOUPLING BRANCH                  -->
+    <!-- ═══════════════════════════════════ -->
+
+    <div id="q1-decouple" class="state">
+      <div class="q-step">Decoupling → step 1 of 2</div>
+      <div class="q-title">What are your operational constraints?</div>
+      <div class="q-subtitle">The right queue depends on whether you want to manage infrastructure or let a cloud provider handle it, and how much throughput you actually need.</div>
+      <div class="options">
+        <div class="opt" onclick="go('q2-managed','Managed / serverless')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Managed — I don't want to operate brokers</div>
+            <div class="opt-sub">Small team, already on AWS/GCP. Want zero broker management. Willing to accept vendor lock-in and slightly higher per-message cost.</div>
+            <div class="opt-numbers">SQS: $0.40/M messages. Zero servers to manage.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q2-selfhost','Self-hosted / high throughput')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Self-hosted — I need control or high throughput</div>
+            <div class="opt-sub">Need &gt;10k msg/s, want protocol flexibility (AMQP, MQTT), or have compliance/data residency requirements that rule out managed services.</div>
+            <div class="opt-numbers">RabbitMQ: ~30k/s. Kafka: ~1M/s. Your infra, your rules.</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <div id="q2-managed" class="state">
+      <div class="q-step">Decoupling → Managed → step 2 of 2</div>
+      <div class="q-title">Do you need strict FIFO ordering?</div>
+      <div class="q-subtitle">Standard queues give you at-least-once delivery and best-effort ordering (which is fine for most cases). FIFO gives you exactly-once and strict ordering but at lower throughput.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-sqs-std','Standard queue')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">No — best-effort ordering is fine</div>
+            <div class="opt-sub">Email sending, image processing, webhook delivery. Order doesn't matter, idempotent consumers handle duplicates.</div>
+            <div class="opt-numbers">SQS Standard: ~unlimited throughput, at-least-once</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-sqs-fifo','FIFO queue')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Yes — per-entity ordering matters</div>
+            <div class="opt-sub">Processing bank transactions, state machine transitions, order lifecycle events. Must process in exact sequence per entity.</div>
+            <div class="opt-numbers">SQS FIFO: 3k msg/s (with batching: 30k/s), exactly-once</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <div id="q2-selfhost" class="state">
+      <div class="q-step">Decoupling → Self-hosted → step 2 of 2</div>
+      <div class="q-title">What kind of routing do you need?</div>
+      <div class="q-subtitle">Simple point-to-point, or complex routing rules like topic exchanges, header-based routing, priority queues, and delayed messages?</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-rabbit','Complex routing')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Complex — topic routing, priorities, TTL</div>
+            <div class="opt-sub">Need routing keys, topic exchanges, dead-letter exchanges, per-message TTL, priority queues. Classic job queue patterns.</div>
+            <div class="opt-numbers">RabbitMQ: rich AMQP routing, ~30k/s, sub-ms latency</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-redis-stream','Simple &amp; fast')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Simple — just a fast queue, already have Redis</div>
+            <div class="opt-sub">You already run Redis. Need a simple work queue without adding another system. Losing messages on crash is acceptable or you have persistence on.</div>
+            <div class="opt-numbers">Redis Streams: ~500k/s, consumer groups, minimal ops overhead</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- FAN-OUT BRANCH                     -->
+    <!-- ═══════════════════════════════════ -->
+
+    <div id="q1-fanout" class="state">
+      <div class="q-step">Fan-out → step 1 of 2</div>
+      <div class="q-title">Do consumers need independent replay & backpressure?</div>
+      <div class="q-subtitle">Key distinction: should each consumer track its own position in the stream (pull-based), or should the broker push a copy of each message to each subscriber?</div>
+      <div class="options">
+        <div class="opt" onclick="go('q2-fanout-pull','Pull-based / replay needed')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Yes — consumers read at their own pace</div>
+            <div class="opt-sub">Different consumers process at different speeds. Analytics might be 2 hours behind, that's fine. Need to replay events when deploying a new service.</div>
+            <div class="opt-numbers">Kafka consumer groups: each group gets all messages, reads independently</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q2-fanout-push','Push-based / simple broadcast')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">No — just broadcast to N subscribers</div>
+            <div class="opt-sub">All consumers process quickly. No need to replay. Simple pub/sub where each subscriber gets a copy. Webhook-style delivery.</div>
+            <div class="opt-numbers">SNS → SQS fan-out: serverless, ~100k msgs/s, no infra to manage</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <div id="q2-fanout-pull" class="state">
+      <div class="q-step">Fan-out → Pull-based → step 2 of 2</div>
+      <div class="q-title">Do you need stream processing (joins, windows, aggregations)?</div>
+      <div class="q-subtitle">Simple fan-out to independent consumers is different from joining multiple streams, computing sliding-window aggregations, or enriching events in real time.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-kafka','No, just fan-out with replay')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">No — independent consumers reading the log</div>
+            <div class="opt-sub">Each service subscribes to topics it cares about. Processes independently. Kafka consumer groups handle offset tracking.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-kafka-streams','Yes, stream processing')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Yes — joins, windows, real-time aggregations</div>
+            <div class="opt-sub">Need to join order events with payment events. Compute 5-minute tumbling window aggregates. Enrich click streams with user profiles in real time.</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <div id="q2-fanout-push" class="state">
+      <div class="q-step">Fan-out → Push-based → step 2 of 2</div>
+      <div class="q-title">Are you on AWS, or do you need protocol flexibility?</div>
+      <div class="q-subtitle">Cloud-native fan-out is trivial on AWS with SNS+SQS. On-prem or multi-cloud, RabbitMQ's exchange types give you the same pattern.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-sns-sqs','AWS — SNS + SQS')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">AWS — fully managed fan-out</div>
+            <div class="opt-sub">SNS topic publishes to multiple SQS queues. Each queue is an independent consumer with its own retry/DLQ. Zero infra.</div>
+            <div class="opt-numbers">SNS: ~30M publishes/month free tier. SQS: $0.40/M requests.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-rabbit-fanout','Self-hosted — RabbitMQ exchanges')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Self-hosted — RabbitMQ fanout exchange</div>
+            <div class="opt-sub">Fanout exchange broadcasts to all bound queues. Can also use topic exchange for pattern-based routing. AMQP gives you protocol-level flexibility.</div>
+            <div class="opt-numbers">Fanout exchange: ~20k msg/s to N queues simultaneously</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- EVENT STREAMING BRANCH             -->
+    <!-- ═══════════════════════════════════ -->
+
+    <div id="q1-stream" class="state">
+      <div class="q-step">Event streaming → step 1 of 2</div>
+      <div class="q-title">What's the primary use case?</div>
+      <div class="q-subtitle">Event streaming spans a wide range — from simple CDC pipelines to full event-sourced architectures. The tooling differs significantly.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-kafka-cdc','CDC — database change capture')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">CDC — stream database changes</div>
+            <div class="opt-sub">Capture every INSERT/UPDATE/DELETE from Postgres/MySQL and stream to downstream systems. Keep a search index, cache, or data warehouse in sync.</div>
+            <div class="opt-numbers">Debezium + Kafka: sub-second CDC at 50k+ changes/s</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q2-event-source','Event sourcing / CQRS')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Event sourcing — events as source of truth</div>
+            <div class="opt-sub">State is derived from an append-only event log. Need to rebuild projections, audit trail, temporal queries. The log IS the database.</div>
+            <div class="opt-numbers">Pattern: event store → projections → read models</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-kafka-connect','Data integration — move data between systems')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Data integration — connect systems via events</div>
+            <div class="opt-sub">Central nervous system: every service publishes events to a shared log. New services can subscribe to any historical event stream.</div>
+            <div class="opt-numbers">Kafka as a central event bus for microservices</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <div id="q2-event-source" class="state">
+      <div class="q-step">Event sourcing → step 2 of 2</div>
+      <div class="q-title">How many aggregates / event streams?</div>
+      <div class="q-subtitle">Event sourcing at small scale (100s of aggregates) has different tooling needs than planet-scale event sourcing (millions of streams).</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-eventstore','Moderate — dedicated event store')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Moderate scale — purpose-built event store</div>
+            <div class="opt-sub">Thousands to low millions of event streams. Need projections, subscriptions, optimistic concurrency built in. DDD-style aggregates.</div>
+            <div class="opt-numbers">EventStoreDB: built for event sourcing, gRPC API, projections engine</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-kafka-es','Massive scale — Kafka as event log')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Massive scale — Kafka-backed event sourcing</div>
+            <div class="opt-sub">Millions of entities, billions of events. Willing to build projection infrastructure yourself. Need Kafka's throughput and ecosystem.</div>
+            <div class="opt-numbers">Kafka + compacted topics: infinite retention, 1M events/s</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- BUFFERING BRANCH                   -->
+    <!-- ═══════════════════════════════════ -->
+
+    <div id="q1-buffer" class="state">
+      <div class="q-step">Buffering → step 1 of 2</div>
+      <div class="q-title">What's the downstream bottleneck?</div>
+      <div class="q-subtitle">The thing you're protecting determines the buffering strategy. A database handles backpressure differently than a third-party API with rate limits.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-kafka-buffer','Database — smooth write spikes')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Database — absorb write spikes</div>
+            <div class="opt-sub">Your Postgres/MySQL can handle 5k writes/s sustained but peaks hit 50k/s. Need a buffer to absorb spikes and drain at a steady rate.</div>
+            <div class="opt-numbers">Kafka → batch consumer → DB: smooth 10:1 peak-to-baseline ratio</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-sqs-buffer','External API — rate limiting')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">External API — respect rate limits</div>
+            <div class="opt-sub">Calling Stripe, Twilio, or a partner API that allows 100 req/s. Need to queue work and drain at a controlled rate with retry on 429s.</div>
+            <div class="opt-numbers">SQS + rate-limited consumer: simple, reliable, built-in retry</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-leaky-bucket','Internal service — backpressure')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Internal service — prevent cascade failure</div>
+            <div class="opt-sub">A slow internal service (ML inference, PDF generation) backs up and causes cascading timeouts. Need to shed load gracefully.</div>
+            <div class="opt-numbers">Queue + bounded concurrency: control in-flight work, fail fast on overflow</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- RESULTS                                -->
+    <!-- ═══════════════════════════════════════ -->
+
+    <!-- SQS Standard -->
+    <div id="r-sqs-std" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.15); color:var(--accent);">SQS</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Amazon SQS — Standard Queue</div>
+          <div class="result-tagline" style="color:var(--text2)">Zero-ops work queue for fire-and-forget tasks</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">at-least-once delivery</span>
+        <span class="tag tag-b">serverless</span>
+        <span class="tag tag-a">best-effort ordering</span>
+        <span class="tag tag-t">unlimited throughput</span>
+      </div>
+      <div class="section-block">
+        <h4>Why SQS Standard</h4>
+        <p>For simple decoupling where you don't need ordering or exactly-once semantics, SQS Standard is the lowest-friction option. No brokers to manage, no capacity planning, no rebalancing. You pay per request. It scales to effectively unlimited throughput automatically. Your consumers must be idempotent because messages can be delivered more than once.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key numbers</h4>
+        <div class="metric-row"><span class="metric-k">Throughput</span><span class="metric-v good">nearly unlimited</span></div>
+        <div class="metric-row"><span class="metric-k">Latency (publish)</span><span class="metric-v warn">~20–50ms</span></div>
+        <div class="metric-row"><span class="metric-k">Max message size</span><span class="metric-v info">256 KB</span></div>
+        <div class="metric-row"><span class="metric-k">Retention</span><span class="metric-v info">4 days (max 14)</span></div>
+        <div class="metric-row"><span class="metric-k">Delivery</span><span class="metric-v warn">at-least-once</span></div>
+        <div class="metric-row"><span class="metric-k">Ordering</span><span class="metric-v warn">best-effort</span></div>
+        <div class="metric-row"><span class="metric-k">Cost</span><span class="metric-v good">$0.40/M requests</span></div>
+      </div>
+      <div class="callout warn">Make consumers idempotent. SQS Standard can deliver duplicates. Use a deduplication key (message ID or business key) to detect re-deliveries.</div>
+      <div class="section-block">
+        <h4>Architecture pattern</h4>
+        <div class="code-block"><span class="cm">// Typical flow</span>
+<span class="kw">Producer</span> → <span class="str">SQS Standard Queue</span> → <span class="kw">Lambda / ECS worker</span>
+                              ↘ <span class="cm">DLQ (after N failures)</span>
+
+<span class="cm">// DLQ pattern: failed messages go to a dead-letter queue</span>
+<span class="cm">// after maxReceiveCount retries. Monitor DLQ depth.</span></div>
+      </div>
+      <div class="callout info">For messages &gt;256 KB, use the SQS Extended Client Library — it stores the payload in S3 and sends a pointer through SQS.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: decoupling → managed → standard</span>
+      </div>
+    </div>
+
+    <!-- SQS FIFO -->
+    <div id="r-sqs-fifo" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(167,139,250,.15); color:var(--accent4);">FIFO</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Amazon SQS — FIFO Queue</div>
+          <div class="result-tagline" style="color:var(--text2)">Exactly-once, strictly ordered processing per group</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">exactly-once</span>
+        <span class="tag tag-b">serverless</span>
+        <span class="tag tag-p">strict FIFO per group</span>
+        <span class="tag tag-a">3k msg/s base</span>
+      </div>
+      <div class="section-block">
+        <h4>Why SQS FIFO</h4>
+        <p>When you need per-entity ordering (all events for user_123 processed in order) and exactly-once delivery without building dedup yourself, FIFO queues handle this at the infrastructure level. The tradeoff is lower throughput — 3k msg/s without batching, up to 30k/s with high-throughput mode. Use MessageGroupId to partition ordering by entity.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key numbers</h4>
+        <div class="metric-row"><span class="metric-k">Throughput</span><span class="metric-v warn">3k msg/s (30k batched)</span></div>
+        <div class="metric-row"><span class="metric-k">Delivery</span><span class="metric-v good">exactly-once</span></div>
+        <div class="metric-row"><span class="metric-k">Ordering</span><span class="metric-v good">strict per MessageGroupId</span></div>
+        <div class="metric-row"><span class="metric-k">Deduplication</span><span class="metric-v good">5-min dedup window</span></div>
+        <div class="metric-row"><span class="metric-k">Cost</span><span class="metric-v warn">$0.50/M requests</span></div>
+      </div>
+      <div class="callout warn">Throughput is per-queue, not per-group. If you have 1000 message groups but send all to one FIFO queue, total throughput is still capped at 3k/s (or 30k/s in high-throughput mode). Shard across multiple queues if needed.</div>
+      <div class="section-block">
+        <h4>MessageGroupId pattern</h4>
+        <div class="code-block"><span class="cm">// Group by entity to get per-entity ordering</span>
+sqs.sendMessage({
+  QueueUrl: <span class="str">"https://sqs...fifo"</span>,
+  MessageBody: payload,
+  MessageGroupId: <span class="str">"order-456"</span>,      <span class="cm">// all order-456 events in order</span>
+  MessageDeduplicationId: <span class="str">"evt-789"</span>  <span class="cm">// prevent duplicates within 5 min</span>
+})</div>
+      </div>
+      <div class="callout info">A blocked message group blocks only that group, not the entire queue. Other groups continue processing independently. This is the key insight that makes FIFO queues usable at scale.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: decoupling → managed → FIFO</span>
+      </div>
+    </div>
+
+    <!-- RabbitMQ -->
+    <div id="r-rabbit" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(255,107,53,.15); color:var(--accent3);">RMQ</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">RabbitMQ</div>
+          <div class="result-tagline" style="color:var(--text2)">Smart broker with rich routing, priorities, and protocol flexibility</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">sub-ms latency</span>
+        <span class="tag tag-p">AMQP 0.9.1</span>
+        <span class="tag tag-a">~30k msg/s</span>
+        <span class="tag tag-t">complex routing</span>
+        <span class="tag tag-b">priority queues</span>
+      </div>
+      <div class="section-block">
+        <h4>Why RabbitMQ</h4>
+        <p>RabbitMQ is a "smart broker, dumb consumer" model — the broker does the routing. It excels when you need exchange types (direct, topic, fanout, headers), per-message TTL, priority queues, delayed messages, and dead-letter exchanges. It pushes messages to consumers, giving you the lowest latency of any traditional broker. The tradeoff: messages are deleted after acknowledgment — no replay.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key numbers</h4>
+        <div class="metric-row"><span class="metric-k">Throughput</span><span class="metric-v warn">~30k msg/s</span></div>
+        <div class="metric-row"><span class="metric-k">Latency</span><span class="metric-v good">&lt;1ms publish</span></div>
+        <div class="metric-row"><span class="metric-k">Routing</span><span class="metric-v good">exchanges, binding keys</span></div>
+        <div class="metric-row"><span class="metric-k">Protocol</span><span class="metric-v info">AMQP, MQTT, STOMP</span></div>
+        <div class="metric-row"><span class="metric-k">Delivery</span><span class="metric-v good">at-least-once (ack-based)</span></div>
+        <div class="metric-row"><span class="metric-k">Replay</span><span class="metric-v bad">not supported</span></div>
+        <div class="metric-row"><span class="metric-k">Clustering</span><span class="metric-v warn">quorum queues (Raft)</span></div>
+      </div>
+      <div class="compare-grid">
+        <div class="compare-cell">
+          <h5 style="color:var(--green)">Strengths</h5>
+          <p>Flexible routing patterns. Priority queues. Per-message TTL. Dead-letter exchanges. Management UI. Multi-protocol. Lowest latency.</p>
+        </div>
+        <div class="compare-cell">
+          <h5 style="color:var(--red)">Weaknesses</h5>
+          <p>No replay/rewind. Slower than Kafka at high throughput. Memory pressure with millions of queued messages. Complex HA setup.</p>
+        </div>
+      </div>
+      <div class="callout danger">RabbitMQ degrades badly when queues grow deep (&gt;100k messages). If consumers can't keep up, messages pile in memory/disk and the broker slows down. Monitor queue depth aggressively.</div>
+      <div class="section-block">
+        <h4>Exchange routing pattern</h4>
+        <div class="code-block"><span class="cm">// Topic exchange — route by pattern matching</span>
+<span class="kw">Exchange</span>: order.events (type: topic)
+  ↳ binding: <span class="str">"order.created"</span>  → queue: billing-service
+  ↳ binding: <span class="str">"order.*"</span>         → queue: audit-log
+  ↳ binding: <span class="str">"order.shipped"</span>   → queue: notification-service
+
+<span class="cm">// Dead-letter exchange</span>
+Queue: billing-service
+  x-dead-letter-exchange: <span class="str">"dlx"</span>
+  x-message-ttl: <span class="num">30000</span>  <span class="cm">// 30s then DLX</span></div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: decoupling → self-hosted → complex routing</span>
+      </div>
+    </div>
+
+    <!-- Redis Streams -->
+    <div id="r-redis-stream" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(248,113,113,.15); color:var(--red);">RED</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Redis Streams</div>
+          <div class="result-tagline" style="color:var(--text2)">Lightweight append-only log built into Redis</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">~500k msg/s</span>
+        <span class="tag tag-t">consumer groups</span>
+        <span class="tag tag-a">memory-bound</span>
+        <span class="tag tag-b">no extra infra</span>
+      </div>
+      <div class="section-block">
+        <h4>Why Redis Streams</h4>
+        <p>If you already run Redis, Streams give you a Kafka-like append-only log with consumer groups — without adding another system. Great for moderate-scale work queues, activity feeds, and simple event distribution. The tradeoff: data is in-memory (or AOF-persisted but still RAM-limited), so you can't store months of history like Kafka. Think of it as "Kafka-lite for teams that already have Redis."</p>
+      </div>
+      <div class="section-block">
+        <h4>Key numbers</h4>
+        <div class="metric-row"><span class="metric-k">Throughput</span><span class="metric-v good">~500k msg/s</span></div>
+        <div class="metric-row"><span class="metric-k">Latency</span><span class="metric-v good">sub-ms</span></div>
+        <div class="metric-row"><span class="metric-k">Consumer groups</span><span class="metric-v good">built-in</span></div>
+        <div class="metric-row"><span class="metric-k">Persistence</span><span class="metric-v warn">AOF / RDB</span></div>
+        <div class="metric-row"><span class="metric-k">Retention</span><span class="metric-v bad">memory-bound</span></div>
+        <div class="metric-row"><span class="metric-k">Ordering</span><span class="metric-v good">per-stream FIFO</span></div>
+      </div>
+      <div class="callout warn">Redis Streams use memory. A stream with 10M messages of 1 KB each ≈ 10 GB RAM. Use MAXLEN or MINID trimming to cap stream size. Don't treat Redis as long-term storage.</div>
+      <div class="section-block">
+        <h4>Consumer group pattern</h4>
+        <div class="code-block"><span class="cm">// Create consumer group</span>
+XGROUP CREATE <span class="str">mystream</span> <span class="str">workers</span> $ MKSTREAM
+
+<span class="cm">// Consumer reads (blocks until message available)</span>
+XREADGROUP GROUP <span class="str">workers</span> <span class="str">worker-1</span> COUNT <span class="num">10</span> BLOCK <span class="num">5000</span> STREAMS <span class="str">mystream</span> >
+
+<span class="cm">// Acknowledge after processing</span>
+XACK <span class="str">mystream</span> <span class="str">workers</span> <span class="num">1526569495631-0</span>
+
+<span class="cm">// Trim to keep last 100k entries</span>
+XTRIM <span class="str">mystream</span> MAXLEN ~ <span class="num">100000</span></div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: decoupling → self-hosted → simple</span>
+      </div>
+    </div>
+
+    <!-- Kafka (fan-out) -->
+    <div id="r-kafka" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.15); color:var(--accent);">KFK</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Apache Kafka</div>
+          <div class="result-tagline" style="color:var(--text2)">Distributed commit log with independent consumer groups</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">~1M msg/s</span>
+        <span class="tag tag-t">consumer groups</span>
+        <span class="tag tag-p">ordered per partition</span>
+        <span class="tag tag-b">infinite retention</span>
+        <span class="tag tag-y">replayable</span>
+      </div>
+      <div class="section-block">
+        <h4>Why Kafka for fan-out</h4>
+        <p>Kafka's consumer group model is the gold standard for fan-out with independent consumption. Each consumer group gets all messages on a topic but tracks its own offset. The analytics team can be hours behind while the billing team processes in real time — neither blocks the other. Messages are retained on disk, so a new service can join and replay from the beginning. This is fundamentally different from traditional queues where messages are deleted on consumption.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key numbers</h4>
+        <div class="metric-row"><span class="metric-k">Throughput</span><span class="metric-v good">1M+ msg/s per broker</span></div>
+        <div class="metric-row"><span class="metric-k">Latency (acks=1)</span><span class="metric-v good">~2ms</span></div>
+        <div class="metric-row"><span class="metric-k">Latency (acks=all)</span><span class="metric-v warn">~5–15ms</span></div>
+        <div class="metric-row"><span class="metric-k">Retention</span><span class="metric-v good">configurable (days–forever)</span></div>
+        <div class="metric-row"><span class="metric-k">Ordering</span><span class="metric-v good">strict per partition</span></div>
+        <div class="metric-row"><span class="metric-k">Consumer groups</span><span class="metric-v good">unlimited</span></div>
+        <div class="metric-row"><span class="metric-k">Replay</span><span class="metric-v good">seek to any offset/timestamp</span></div>
+      </div>
+      <div class="compare-grid">
+        <div class="compare-cell">
+          <h5 style="color:var(--green)">Kafka does well</h5>
+          <p>High throughput. Fan-out to N consumer groups. Event replay. Long retention. Ordering per partition key. Horizontal scaling via partitions.</p>
+        </div>
+        <div class="compare-cell">
+          <h5 style="color:var(--red)">Kafka does NOT do</h5>
+          <p>Per-message routing/filtering (consumer reads all). Priority queues. Delayed delivery. Message-level TTL. Sub-ms latency.</p>
+        </div>
+      </div>
+      <div class="callout info">Partition count = max parallelism per consumer group. If you have 12 partitions, at most 12 consumers in a group can read in parallel. Over-partition early: it's cheap and hard to change later.</div>
+      <div class="section-block">
+        <h4>Fan-out architecture</h4>
+        <div class="code-block"><span class="kw">Topic</span>: order-events (partitions: <span class="num">12</span>, replication: <span class="num">3</span>)
+
+<span class="cm">// Each consumer group independently reads ALL messages</span>
+<span class="kw">Group</span>: billing-service     → <span class="num">3</span> consumers → processes payments
+<span class="kw">Group</span>: inventory-service   → <span class="num">3</span> consumers → updates stock
+<span class="kw">Group</span>: notification-service → <span class="num">2</span> consumers → sends emails
+<span class="kw">Group</span>: analytics-pipeline  → <span class="num">1</span> consumer  → ETL to warehouse
+
+<span class="cm">// Key insight: groups are independent.</span>
+<span class="cm">// Analytics can lag 2 hours without affecting billing.</span></div>
+      </div>
+      <div class="callout warn">Partition key design matters. All messages with the same key go to the same partition (same consumer). Choose a key that distributes evenly — user_id or order_id, not country_code.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: fan-out → pull-based → simple fan-out</span>
+      </div>
+    </div>
+
+    <!-- Kafka + Stream Processing -->
+    <div id="r-kafka-streams" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.15); color:var(--accent5);">KS</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Kafka + Stream Processing</div>
+          <div class="result-tagline" style="color:var(--text2)">Real-time joins, windows, and aggregations on event streams</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-b">stream processing</span>
+        <span class="tag tag-p">windowed aggregation</span>
+        <span class="tag tag-t">stream-table joins</span>
+        <span class="tag tag-y">exactly-once</span>
+      </div>
+      <div class="section-block">
+        <h4>When to add stream processing</h4>
+        <p>Plain Kafka consumers read events one at a time. Stream processing frameworks let you do real-time joins (enrich orders with user data), sliding/tumbling window aggregations (requests per minute), stateful transformations (session windows), and exactly-once semantics across input → process → output. You have three main options, each with different tradeoffs.</p>
+      </div>
+      <div class="section-block">
+        <h4>Framework comparison</h4>
+        <div class="metric-row"><span class="metric-k">Kafka Streams</span><span class="metric-v info">library (JVM), no cluster needed</span></div>
+        <div class="metric-row"><span class="metric-k">Apache Flink</span><span class="metric-v good">most powerful, its own cluster</span></div>
+        <div class="metric-row"><span class="metric-k">ksqlDB</span><span class="metric-v info">SQL over streams, good for prototyping</span></div>
+      </div>
+      <div class="compare-grid">
+        <div class="compare-cell">
+          <h5 style="color:var(--accent5)">Kafka Streams</h5>
+          <p>Java library. Runs in your app — no separate cluster. Good for moderate complexity: joins, aggregations, repartitioning. Scales with your app instances.</p>
+        </div>
+        <div class="compare-cell">
+          <h5 style="color:var(--accent2)">Apache Flink</h5>
+          <p>Separate cluster. Best for complex event processing, large-scale joins, exactly-once across systems, and advanced windowing. Steeper ops overhead but most capable.</p>
+        </div>
+      </div>
+      <div class="callout good">Start with Kafka Streams if you're already on JVM. It's just a library — no cluster to deploy. Move to Flink when you need cross-system exactly-once, complex event processing, or Python/SQL interfaces.</div>
+      <div class="section-block">
+        <h4>Windowed aggregation example</h4>
+        <div class="code-block"><span class="cm">// Kafka Streams: 5-minute tumbling window</span>
+stream
+  .groupByKey()
+  .windowedBy(TimeWindows.ofSizeWithNoGrace(Duration.ofMinutes(<span class="num">5</span>)))
+  .count()
+  .toStream()
+  .to(<span class="str">"request-counts-per-5min"</span>);
+
+<span class="cm">// Flink SQL equivalent</span>
+<span class="kw">SELECT</span> user_id, COUNT(*) <span class="kw">AS</span> cnt,
+       TUMBLE_START(event_time, INTERVAL <span class="str">'5'</span> MINUTE) <span class="kw">AS</span> window_start
+<span class="kw">FROM</span> clickstream
+<span class="kw">GROUP BY</span> user_id, TUMBLE(event_time, INTERVAL <span class="str">'5'</span> MINUTE);</div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: fan-out → pull-based → stream processing</span>
+      </div>
+    </div>
+
+    <!-- SNS + SQS Fan-out -->
+    <div id="r-sns-sqs" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(0,255,200,.15); color:var(--accent2);">SNS</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">SNS + SQS Fan-out</div>
+          <div class="result-tagline" style="color:var(--text2)">Serverless pub/sub — one publish, N independent queues</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">zero ops</span>
+        <span class="tag tag-b">serverless</span>
+        <span class="tag tag-t">message filtering</span>
+        <span class="tag tag-a">~100k msgs/s</span>
+      </div>
+      <div class="section-block">
+        <h4>Why SNS + SQS</h4>
+        <p>The simplest fan-out pattern on AWS. Publish once to an SNS topic. Each subscribing SQS queue gets a copy independently. Each queue has its own DLQ, retry policy, and consumer. Adding a new subscriber is just creating a new SQS queue and subscribing it — zero code changes to the producer. SNS also supports message filtering, so subscribers can receive only the events they care about without client-side filtering.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key numbers</h4>
+        <div class="metric-row"><span class="metric-k">SNS publish throughput</span><span class="metric-v good">~30M/month free, then $0.50/M</span></div>
+        <div class="metric-row"><span class="metric-k">Max subscribers per topic</span><span class="metric-v info">12.5M</span></div>
+        <div class="metric-row"><span class="metric-k">Message size</span><span class="metric-v info">256 KB</span></div>
+        <div class="metric-row"><span class="metric-k">Delivery to SQS</span><span class="metric-v good">~50–100ms</span></div>
+        <div class="metric-row"><span class="metric-k">Fan-out latency</span><span class="metric-v good">parallel to all subscribers</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Architecture</h4>
+        <div class="code-block"><span class="kw">Producer</span> → <span class="str">SNS Topic: order-events</span>
+               ├→ <span class="kw">SQS: billing-queue</span>     → Billing Lambda
+               ├→ <span class="kw">SQS: inventory-queue</span>   → Inventory service
+               ├→ <span class="kw">SQS: notification-queue</span> → Email Lambda
+               └→ <span class="kw">SQS: analytics-queue</span>   → Firehose → S3
+
+<span class="cm">// SNS filter policy (subscriber only gets matching events)</span>
+{
+  <span class="str">"event_type"</span>: [<span class="str">"order_shipped"</span>, <span class="str">"order_delivered"</span>]
+}</div>
+      </div>
+      <div class="callout good">SNS filter policies let each SQS subscriber receive only relevant events. This is cheaper and simpler than filtering in the consumer — fewer SQS requests, less compute.</div>
+      <div class="callout warn">SNS+SQS has no replay. Once consumed and deleted, messages are gone. If you need replay, use Kafka or archive to S3 via Firehose alongside the fan-out.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: fan-out → push-based → AWS</span>
+      </div>
+    </div>
+
+    <!-- RabbitMQ fanout exchange -->
+    <div id="r-rabbit-fanout" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(255,107,53,.15); color:var(--accent3);">RMQ</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">RabbitMQ — Fanout Exchange</div>
+          <div class="result-tagline" style="color:var(--text2)">Broadcast every message to all bound queues</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">broadcast</span>
+        <span class="tag tag-p">AMQP</span>
+        <span class="tag tag-t">exchange routing</span>
+        <span class="tag tag-a">~20k msg/s</span>
+      </div>
+      <div class="section-block">
+        <h4>Why RabbitMQ fanout</h4>
+        <p>A fanout exchange sends every message to every bound queue — simple broadcast. Unlike SNS+SQS, you get AMQP protocol support, on-prem deployment, and can combine with topic/headers exchanges for sophisticated routing in the same broker. Each bound queue is an independent consumer with its own acknowledgment and retry semantics. For multi-cloud or on-prem, this is the go-to fan-out pattern.</p>
+      </div>
+      <div class="section-block">
+        <h4>Exchange types for different fan-out needs</h4>
+        <div class="metric-row"><span class="metric-k">fanout</span><span class="metric-v good">broadcast to all queues</span></div>
+        <div class="metric-row"><span class="metric-k">topic</span><span class="metric-v info">route by pattern (order.*)</span></div>
+        <div class="metric-row"><span class="metric-k">direct</span><span class="metric-v info">route by exact key</span></div>
+        <div class="metric-row"><span class="metric-k">headers</span><span class="metric-v warn">route by message headers</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Setup pattern</h4>
+        <div class="code-block"><span class="cm">// Declare fanout exchange</span>
+channel.exchangeDeclare(<span class="str">"order-events"</span>, <span class="str">"fanout"</span>, durable: <span class="kw">true</span>);
+
+<span class="cm">// Each service creates its own queue and binds</span>
+channel.queueDeclare(<span class="str">"billing-q"</span>, durable: <span class="kw">true</span>);
+channel.queueBind(<span class="str">"billing-q"</span>, <span class="str">"order-events"</span>, <span class="str">""</span>);
+
+channel.queueDeclare(<span class="str">"inventory-q"</span>, durable: <span class="kw">true</span>);
+channel.queueBind(<span class="str">"inventory-q"</span>, <span class="str">"order-events"</span>, <span class="str">""</span>);
+
+<span class="cm">// Producer publishes once — both queues get a copy</span>
+channel.basicPublish(<span class="str">"order-events"</span>, <span class="str">""</span>, props, body);</div>
+      </div>
+      <div class="callout info">Need pattern-based filtering? Use a topic exchange instead. Binding key "order.shipped" matches routing key "order.shipped". Binding "order.*" matches any order event.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: fan-out → push-based → self-hosted</span>
+      </div>
+    </div>
+
+    <!-- Kafka CDC -->
+    <div id="r-kafka-cdc" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.15); color:var(--accent);">CDC</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Debezium + Kafka (CDC)</div>
+          <div class="result-tagline" style="color:var(--text2)">Stream every database change to downstream systems in real time</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">sub-second lag</span>
+        <span class="tag tag-t">change data capture</span>
+        <span class="tag tag-p">Postgres WAL / MySQL binlog</span>
+        <span class="tag tag-y">no app code changes</span>
+      </div>
+      <div class="section-block">
+        <h4>Why CDC with Debezium + Kafka</h4>
+        <p>CDC reads your database's transaction log (Postgres WAL, MySQL binlog) and streams every INSERT/UPDATE/DELETE as an event to Kafka topics — one topic per table. Downstream consumers (Elasticsearch, Redis, data warehouse) stay in sync without dual-write bugs. The critical insight: your database already records every change in its WAL. CDC just exposes that log as a stream. No application code changes needed.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key numbers</h4>
+        <div class="metric-row"><span class="metric-k">Throughput</span><span class="metric-v good">50k+ changes/s</span></div>
+        <div class="metric-row"><span class="metric-k">End-to-end lag</span><span class="metric-v good">~100ms–1s typical</span></div>
+        <div class="metric-row"><span class="metric-k">DB overhead</span><span class="metric-v warn">~5% (reads WAL, no queries)</span></div>
+        <div class="metric-row"><span class="metric-k">Supported DBs</span><span class="metric-v info">Postgres, MySQL, MongoDB, SQL Server</span></div>
+        <div class="metric-row"><span class="metric-k">Deployment</span><span class="metric-v info">Kafka Connect connector</span></div>
+      </div>
+      <div class="callout danger">Never do dual writes (write to DB + publish to Kafka in app code). One will fail and you'll have inconsistency. CDC eliminates this problem — the DB write IS the event source.</div>
+      <div class="section-block">
+        <h4>Architecture</h4>
+        <div class="code-block"><span class="kw">Postgres</span> (WAL) → <span class="str">Debezium connector</span> → <span class="kw">Kafka</span>
+                                                 ├→ topic: db.public.users
+                                                 ├→ topic: db.public.orders
+                                                 └→ topic: db.public.products
+
+<span class="cm">// Downstream consumers</span>
+db.public.orders → <span class="kw">Elasticsearch</span> (search index)
+db.public.orders → <span class="kw">Redis</span> (cache invalidation)
+db.public.orders → <span class="kw">Snowflake</span> (analytics)</div>
+      </div>
+      <div class="callout good">Debezium captures the before and after state of each row change. This means consumers can compute diffs, detect deletions, and build accurate materialized views.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: event streaming → CDC</span>
+      </div>
+    </div>
+
+    <!-- EventStoreDB -->
+    <div id="r-eventstore" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(167,139,250,.15); color:var(--accent4);">ES</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">EventStoreDB</div>
+          <div class="result-tagline" style="color:var(--text2)">Purpose-built database for event sourcing</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-p">event sourcing native</span>
+        <span class="tag tag-g">optimistic concurrency</span>
+        <span class="tag tag-t">projections engine</span>
+        <span class="tag tag-b">gRPC / HTTP API</span>
+      </div>
+      <div class="section-block">
+        <h4>Why EventStoreDB</h4>
+        <p>EventStoreDB is designed specifically for event sourcing. Every event is appended to a stream (typically one stream per aggregate). It has built-in optimistic concurrency control, catch-up subscriptions for building projections, and a projections engine for cross-stream queries. Unlike Kafka, streams map 1:1 to business entities — stream "order-456" contains only events for that order. This is the right fit when your domain model is event-sourced and you want the tooling to match.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key features</h4>
+        <div class="metric-row"><span class="metric-k">Stream per aggregate</span><span class="metric-v good">natural DDD mapping</span></div>
+        <div class="metric-row"><span class="metric-k">Optimistic concurrency</span><span class="metric-v good">expected version on append</span></div>
+        <div class="metric-row"><span class="metric-k">Catch-up subscriptions</span><span class="metric-v good">replay + live tail</span></div>
+        <div class="metric-row"><span class="metric-k">$all stream</span><span class="metric-v info">global ordered log</span></div>
+        <div class="metric-row"><span class="metric-k">Projections</span><span class="metric-v info">JS-based, runs in DB</span></div>
+        <div class="metric-row"><span class="metric-k">Throughput</span><span class="metric-v warn">~50k events/s (single node)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Event sourcing pattern</h4>
+        <div class="code-block"><span class="cm">// Append events to a stream</span>
+<span class="kw">stream</span>: <span class="str">"order-456"</span>
+  [<span class="num">0</span>] OrderCreated   { items: [...], customer: <span class="str">"user-789"</span> }
+  [<span class="num">1</span>] PaymentReceived { amount: <span class="num">149.99</span>, method: <span class="str">"card"</span> }
+  [<span class="num">2</span>] OrderShipped    { tracking: <span class="str">"1Z999..."</span> }
+
+<span class="cm">// Rebuild current state: replay events 0→2</span>
+<span class="cm">// Optimistic concurrency: append at expected version 2</span>
+<span class="cm">// If another write happened, you get a conflict — handle it</span>
+
+<span class="cm">// Projection: subscribe to $all, filter OrderCreated events</span>
+<span class="cm">// Build a read model: "orders by customer" in Postgres/Redis</span></div>
+      </div>
+      <div class="callout info">EventStoreDB vs Kafka for event sourcing: EventStoreDB gives you per-aggregate streams and optimistic concurrency out of the box. Kafka gives you higher throughput but you must build concurrency control and per-entity stream abstraction yourself.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: event streaming → event sourcing → moderate scale</span>
+      </div>
+    </div>
+
+    <!-- Kafka for event sourcing -->
+    <div id="r-kafka-es" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.15); color:var(--accent);">KFK</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Kafka — Event Sourcing at Scale</div>
+          <div class="result-tagline" style="color:var(--text2)">Distributed commit log as your event store</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">1M+ events/s</span>
+        <span class="tag tag-y">compacted topics</span>
+        <span class="tag tag-t">infinite retention</span>
+        <span class="tag tag-a">DIY concurrency</span>
+      </div>
+      <div class="section-block">
+        <h4>Why Kafka for event sourcing</h4>
+        <p>At massive scale (millions of entities, billions of events), Kafka's throughput and ecosystem are hard to beat. Use compacted topics to retain only the latest state per key, or configure infinite retention to keep every event forever. The tradeoff: Kafka doesn't natively support per-entity concurrency control or per-entity streams — you partition by entity key and build optimistic concurrency in your application layer. This is more work but gives you Netflix/Uber-scale event sourcing.</p>
+      </div>
+      <div class="section-block">
+        <h4>Tradeoffs vs EventStoreDB</h4>
+        <div class="metric-row"><span class="metric-k">Throughput</span><span class="metric-v good">1M+/s (vs 50k/s)</span></div>
+        <div class="metric-row"><span class="metric-k">Per-entity streams</span><span class="metric-v bad">DIY (partition by key)</span></div>
+        <div class="metric-row"><span class="metric-k">Optimistic concurrency</span><span class="metric-v bad">DIY (app-level)</span></div>
+        <div class="metric-row"><span class="metric-k">Projections</span><span class="metric-v warn">Kafka Streams / Flink</span></div>
+        <div class="metric-row"><span class="metric-k">Ecosystem</span><span class="metric-v good">Connect, Streams, Schema Registry</span></div>
+        <div class="metric-row"><span class="metric-k">Ops complexity</span><span class="metric-v warn">ZooKeeper (or KRaft)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Compacted topics</h4>
+        <div class="code-block"><span class="cm">// Log compaction: Kafka keeps the LATEST value per key</span>
+<span class="cm">// Useful for "current state" snapshots</span>
+
+<span class="kw">Topic</span>: user-profiles (cleanup.policy=<span class="str">compact</span>)
+  key=<span class="str">user-123</span> → { name: <span class="str">"Alice"</span>, plan: <span class="str">"free"</span> }     <span class="cm">// deleted by compaction</span>
+  key=<span class="str">user-456</span> → { name: <span class="str">"Bob"</span>, plan: <span class="str">"pro"</span> }
+  key=<span class="str">user-123</span> → { name: <span class="str">"Alice"</span>, plan: <span class="str">"enterprise"</span> } <span class="cm">// kept (latest)</span>
+
+<span class="cm">// Full event history: use a separate topic with retention=forever</span>
+<span class="kw">Topic</span>: user-events (cleanup.policy=<span class="str">delete</span>, retention.ms=<span class="num">-1</span>)
+  → every event ever, never deleted</div>
+      </div>
+      <div class="callout warn">Kafka's partition count is set at topic creation and is hard to change (repartitioning requires rewriting data). Plan for 3-5x your current scale when setting partition counts.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: event streaming → event sourcing → massive scale</span>
+      </div>
+    </div>
+
+    <!-- Kafka Connect -->
+    <div id="r-kafka-connect" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(0,255,200,.15); color:var(--accent2);">KC</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Kafka as Central Event Bus</div>
+          <div class="result-tagline" style="color:var(--text2)">The nervous system connecting all your microservices</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">data integration</span>
+        <span class="tag tag-t">Kafka Connect</span>
+        <span class="tag tag-b">Schema Registry</span>
+        <span class="tag tag-y">event-driven architecture</span>
+      </div>
+      <div class="section-block">
+        <h4>Why Kafka as an event bus</h4>
+        <p>In a microservices architecture, Kafka acts as the central event bus. Every service publishes domain events to Kafka topics. Any service — existing or future — can subscribe to any topic and build its own view of the data. This decouples services at the data level. Kafka Connect provides pre-built connectors to move data between Kafka and 100+ external systems (databases, S3, Elasticsearch, Snowflake) without writing code.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key components</h4>
+        <div class="metric-row"><span class="metric-k">Kafka Connect</span><span class="metric-v good">200+ connectors (source & sink)</span></div>
+        <div class="metric-row"><span class="metric-k">Schema Registry</span><span class="metric-v good">Avro/Protobuf schema evolution</span></div>
+        <div class="metric-row"><span class="metric-k">Kafka Streams</span><span class="metric-v info">in-app stream processing</span></div>
+        <div class="metric-row"><span class="metric-k">MirrorMaker</span><span class="metric-v info">cross-datacenter replication</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Event-driven architecture</h4>
+        <div class="code-block"><span class="cm">// Services publish domain events</span>
+<span class="kw">User Service</span>   → topic: <span class="str">user-events</span>     (UserCreated, UserUpdated)
+<span class="kw">Order Service</span>  → topic: <span class="str">order-events</span>    (OrderPlaced, OrderShipped)
+<span class="kw">Payment Service</span>→ topic: <span class="str">payment-events</span>  (PaymentProcessed, Refunded)
+
+<span class="cm">// Kafka Connect sinks (no code)</span>
+order-events   → <span class="kw">Elasticsearch</span> (search)
+*-events       → <span class="kw">S3 via Firehose</span> (data lake)
+user-events    → <span class="kw">Redis</span> (cache warm)
+
+<span class="cm">// New service joins 6 months later</span>
+<span class="cm">// Reads order-events from offset 0 — full replay</span>
+<span class="kw">Fraud Service</span>  ← topic: <span class="str">order-events</span> (replay all history)</div>
+      </div>
+      <div class="callout good">Schema Registry is critical for event-driven architectures. It enforces backward/forward compatibility — a producer can add a field without breaking existing consumers. Use Avro or Protobuf, not JSON.</div>
+      <div class="callout warn">An event bus is not a request-reply mechanism. If service A needs a synchronous response from service B, use HTTP/gRPC. Events are for "this happened" notifications, not "do this and tell me the result."</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: event streaming → data integration</span>
+      </div>
+    </div>
+
+    <!-- Kafka buffer for DB writes -->
+    <div id="r-kafka-buffer" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.15); color:var(--accent);">BUF</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Kafka — Write Buffer</div>
+          <div class="result-tagline" style="color:var(--text2)">Absorb write spikes, drain to the database at a steady rate</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">spike absorption</span>
+        <span class="tag tag-t">batch consumer</span>
+        <span class="tag tag-y">backpressure</span>
+        <span class="tag tag-b">DB protection</span>
+      </div>
+      <div class="section-block">
+        <h4>Why Kafka as a write buffer</h4>
+        <p>Your database can sustain 5k writes/s, but traffic spikes to 50k/s during peak. Instead of losing writes or overloading the DB, put Kafka in front. Kafka absorbs the spike (it can handle 1M writes/s to disk). A consumer drains Kafka at the database's comfortable rate, batching inserts for maximum efficiency. The writes are durably stored in Kafka — if the DB goes down, messages wait until it recovers. Zero data loss.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key numbers</h4>
+        <div class="metric-row"><span class="metric-k">Kafka ingest rate</span><span class="metric-v good">1M+ msg/s</span></div>
+        <div class="metric-row"><span class="metric-k">Batched DB writes</span><span class="metric-v good">10–50x faster than single inserts</span></div>
+        <div class="metric-row"><span class="metric-k">Spike absorption</span><span class="metric-v good">limited only by disk</span></div>
+        <div class="metric-row"><span class="metric-k">Recovery</span><span class="metric-v good">consumer resumes from offset</span></div>
+        <div class="metric-row"><span class="metric-k">Data loss risk</span><span class="metric-v good">zero (acks=all, replication)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Architecture</h4>
+        <div class="code-block"><span class="cm">// Without buffer (breaks under load)</span>
+<span class="kw">API</span> → <span class="kw">Postgres</span>  <span class="cm">// 50k/s spike → DB overwhelmed → 504s</span>
+
+<span class="cm">// With Kafka buffer</span>
+<span class="kw">API</span> → <span class="str">Kafka topic</span> → <span class="kw">Batch consumer</span> → <span class="kw">Postgres</span>
+       <span class="cm">(absorbs 50k/s)   (drains at 5k/s)   (happy)</span>
+
+<span class="cm">// Batch consumer pattern</span>
+<span class="kw">while</span> (<span class="kw">true</span>) {
+  records = consumer.poll(Duration.ofMillis(<span class="num">500</span>));
+  batch = records.collect();  <span class="cm">// accumulate 100–1000 records</span>
+  db.batchInsert(batch);      <span class="cm">// single INSERT with 1000 rows</span>
+  consumer.commitSync();      <span class="cm">// commit offset after DB write</span>
+}</div>
+      </div>
+      <div class="callout good">Batch inserts are 10–50x faster than individual inserts. 1000 rows in one INSERT statement vs 1000 individual INSERT statements — the difference is dramatic due to reduced round-trips and transaction overhead.</div>
+      <div class="callout warn">Consumer lag is normal and expected. The whole point is that consumers are slower than producers during spikes. Monitor lag — it should drain back to zero after the spike. If it never does, you have a sustained throughput problem, not a spike problem.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: buffering → database protection</span>
+      </div>
+    </div>
+
+    <!-- SQS buffer for APIs -->
+    <div id="r-sqs-buffer" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.15); color:var(--accent5);">SQS</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">SQS — Rate-Limited Consumer</div>
+          <div class="result-tagline" style="color:var(--text2)">Queue work and drain at the API's rate limit</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-b">serverless</span>
+        <span class="tag tag-t">rate limiting</span>
+        <span class="tag tag-g">automatic retry</span>
+        <span class="tag tag-a">DLQ for failures</span>
+      </div>
+      <div class="section-block">
+        <h4>Why SQS for API rate limiting</h4>
+        <p>When calling rate-limited external APIs (Stripe: 100/s, Twilio: 1/s per number, partner APIs with quotas), SQS acts as a buffer. Your app enqueues requests instantly (no blocking). A consumer pulls from the queue at a controlled rate, respecting the API's limits. On 429 (rate limited) or 5xx errors, the message goes back to the queue automatically after the visibility timeout — built-in retry with no code. After N failures, it moves to a DLQ for investigation.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key design decisions</h4>
+        <div class="metric-row"><span class="metric-k">Visibility timeout</span><span class="metric-v info">set to 2x your processing time</span></div>
+        <div class="metric-row"><span class="metric-k">Max receive count</span><span class="metric-v info">3–5 (then DLQ)</span></div>
+        <div class="metric-row"><span class="metric-k">Concurrency</span><span class="metric-v info">Lambda reserved concurrency = rate limit</span></div>
+        <div class="metric-row"><span class="metric-k">Batch size</span><span class="metric-v info">1 for rate-limited APIs</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Architecture</h4>
+        <div class="code-block"><span class="cm">// Rate-limited API call pattern</span>
+<span class="kw">App</span> → <span class="str">SQS Queue</span> → <span class="kw">Lambda</span> (reserved concurrency: <span class="num">10</span>) → <span class="kw">External API</span>
+                  ↘ <span class="str">DLQ</span> (after <span class="num">3</span> failures)         (rate limit: <span class="num">10</span>/s)
+
+<span class="cm">// Lambda reserved concurrency = API rate limit</span>
+<span class="cm">// This naturally throttles consumption to match the API</span>
+
+<span class="cm">// For non-Lambda: use a consumer with a token bucket</span>
+limiter = TokenBucket(rate=<span class="num">10</span>, burst=<span class="num">10</span>)
+<span class="kw">while</span> (<span class="kw">true</span>) {
+  msg = sqs.receiveMessage();
+  limiter.acquire();           <span class="cm">// blocks until token available</span>
+  result = callExternalAPI(msg);
+  sqs.deleteMessage(msg);
+}</div>
+      </div>
+      <div class="callout good">Lambda's reserved concurrency is the simplest rate limiter. Set it equal to the API's rate limit. SQS + Lambda handles all the retry, backoff, and DLQ logic for you.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: buffering → external API</span>
+      </div>
+    </div>
+
+    <!-- Leaky bucket / backpressure -->
+    <div id="r-leaky-bucket" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(251,191,36,.15); color:var(--amber);">BP</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Queue + Bounded Concurrency</div>
+          <div class="result-tagline" style="color:var(--text2)">Control in-flight work to prevent cascade failures</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-a">backpressure</span>
+        <span class="tag tag-t">bounded concurrency</span>
+        <span class="tag tag-g">graceful degradation</span>
+        <span class="tag tag-r">load shedding</span>
+      </div>
+      <div class="section-block">
+        <h4>Why bounded concurrency</h4>
+        <p>A slow internal service (ML inference: 500ms/request, PDF generation: 2s/request) becomes a bottleneck under load. Without backpressure, upstream services pile up connections, exhaust thread pools, and cascade-fail. The fix: put a queue in front and limit the number of in-flight requests to the slow service. This is the "leaky bucket" pattern — the queue absorbs bursts, consumers drain at a fixed rate, and if the queue fills up, you fail fast instead of failing slowly.</p>
+      </div>
+      <div class="section-block">
+        <h4>Key design principles</h4>
+        <div class="metric-row"><span class="metric-k">Max in-flight</span><span class="metric-v info">= service capacity (benchmark it)</span></div>
+        <div class="metric-row"><span class="metric-k">Queue max depth</span><span class="metric-v info">bounded (reject when full)</span></div>
+        <div class="metric-row"><span class="metric-k">Timeout</span><span class="metric-v info">set on enqueue, not processing</span></div>
+        <div class="metric-row"><span class="metric-k">Overflow behavior</span><span class="metric-v warn">fail fast with 503, don't block</span></div>
+      </div>
+      <div class="compare-grid">
+        <div class="compare-cell">
+          <h5 style="color:var(--red)">Without backpressure</h5>
+          <p>ML service slows down → requests queue in thread pool → upstream services timeout → retry storm → everything dies. Total outage from a slow dependency.</p>
+        </div>
+        <div class="compare-cell">
+          <h5 style="color:var(--green)">With backpressure</h5>
+          <p>ML service slows down → queue absorbs burst → bounded workers process at capacity → queue full? → 503 immediately → upstream handles gracefully → partial degradation, not total failure.</p>
+        </div>
+      </div>
+      <div class="section-block">
+        <h4>Implementation options</h4>
+        <div class="code-block"><span class="cm">// Option 1: SQS + Lambda (simplest)</span>
+<span class="kw">API</span> → <span class="str">SQS</span> → <span class="kw">Lambda</span> (reserved concurrency: <span class="num">20</span>) → <span class="kw">ML Service</span>
+<span class="cm">// Lambda processes max 20 at a time</span>
+
+<span class="cm">// Option 2: In-process semaphore (no queue needed)</span>
+semaphore = Semaphore(permits=<span class="num">20</span>)
+<span class="kw">if</span> (!semaphore.tryAcquire(timeout=<span class="num">100</span>ms)) {
+  <span class="kw">return</span> <span class="num">503</span> <span class="str">"Service busy, try later"</span>
+}
+
+<span class="cm">// Option 3: BullMQ / Celery (job queue with concurrency limit)</span>
+queue = <span class="kw">new</span> Queue(<span class="str">"ml-inference"</span>, { concurrency: <span class="num">20</span> })
+queue.add(<span class="str">"predict"</span>, payload)
+<span class="cm">// 21st job waits in queue, doesn't hit the ML service</span></div>
+      </div>
+      <div class="callout danger">The most common mistake: no queue depth limit. An unbounded queue just moves the OOM from the service to the queue. Always set a max depth and decide what happens when it's full (reject, drop oldest, or shed lowest-priority).</div>
+      <div class="callout info">Circuit breakers (Hystrix, resilience4j) complement queues. The queue handles normal backpressure. The circuit breaker handles "service is completely dead" — it stops sending requests entirely and fails fast.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: buffering → internal service → backpressure</span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="right-panel">
+    <div class="rp-section">
+      <div class="rp-label">Technologies</div>
+      <div class="db-card" id="dbc-kafka">
+        <div class="db-card-name">Apache Kafka</div>
+        <div class="db-card-meta">Distributed commit log. Pull-based. Replayable.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">1M msg/s</span>
+          <span class="db-stat">ordered/partition</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-rabbit">
+        <div class="db-card-name">RabbitMQ</div>
+        <div class="db-card-meta">Smart broker. AMQP. Push-based. Rich routing.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">~30k msg/s</span>
+          <span class="db-stat">&lt;1ms latency</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-sqs">
+        <div class="db-card-name">Amazon SQS</div>
+        <div class="db-card-meta">Managed queue. Zero ops. Standard or FIFO.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">unlimited (std)</span>
+          <span class="db-stat">$0.40/M</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-sns">
+        <div class="db-card-name">Amazon SNS</div>
+        <div class="db-card-meta">Managed pub/sub. Fan-out to SQS, Lambda, HTTP.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">push-based</span>
+          <span class="db-stat">filter policies</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-redis">
+        <div class="db-card-name">Redis Streams</div>
+        <div class="db-card-meta">In-memory append log. Consumer groups. Fast.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">~500k msg/s</span>
+          <span class="db-stat">memory-bound</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-eventstore">
+        <div class="db-card-name">EventStoreDB</div>
+        <div class="db-card-meta">Event sourcing native. Per-aggregate streams.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">~50k events/s</span>
+          <span class="db-stat">projections</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-flink">
+        <div class="db-card-name">Apache Flink</div>
+        <div class="db-card-meta">Stream processing. Joins, windows, exactly-once.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">stateful</span>
+          <span class="db-stat">SQL interface</span>
+        </div>
+      </div>
+    </div>
+    <div class="rp-section">
+      <div class="rp-label">Golden rules</div>
+      <div class="rule-item"><span class="rule-num">01</span><span>If you don't need replay, you probably don't need Kafka. SQS or RabbitMQ are simpler.</span></div>
+      <div class="rule-item"><span class="rule-num">02</span><span>Never dual-write (DB + queue in app code). Use CDC or transactional outbox.</span></div>
+      <div class="rule-item"><span class="rule-num">03</span><span>Make every consumer idempotent. Messages WILL be delivered more than once.</span></div>
+      <div class="rule-item"><span class="rule-num">04</span><span>Monitor consumer lag, not just throughput. Lag tells you if consumers are keeping up.</span></div>
+      <div class="rule-item"><span class="rule-num">05</span><span>Dead-letter queues are not optional. Every queue needs a DLQ and someone watching it.</span></div>
+      <div class="rule-item"><span class="rule-num">06</span><span>Schema evolution breaks things silently. Use Schema Registry with compatibility checks.</span></div>
+      <div class="rule-item"><span class="rule-num">07</span><span>A queue is not a database. Don't query it, don't store state in it, don't treat it as durable storage (except Kafka).</span></div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+const history = [];
+const stateLabels = {
+  'q0':'Start',
+  'q1-decouple':'Decoupling','q1-fanout':'Fan-out','q1-stream':'Event streaming','q1-buffer':'Buffering',
+  'q2-managed':'Managed','q2-selfhost':'Self-hosted','q2-fanout-pull':'Pull-based','q2-fanout-push':'Push-based',
+  'q2-event-source':'Event sourcing',
+  'r-sqs-std':'SQS Standard','r-sqs-fifo':'SQS FIFO','r-rabbit':'RabbitMQ','r-redis-stream':'Redis Streams',
+  'r-kafka':'Kafka','r-kafka-streams':'Kafka Streams','r-sns-sqs':'SNS+SQS','r-rabbit-fanout':'RabbitMQ Fanout',
+  'r-kafka-cdc':'Debezium+Kafka','r-eventstore':'EventStoreDB','r-kafka-es':'Kafka ES','r-kafka-connect':'Kafka Bus',
+  'r-kafka-buffer':'Kafka Buffer','r-sqs-buffer':'SQS Buffer','r-leaky-bucket':'Backpressure'
+};
+const resultHighlights = {
+  'r-sqs-std':'dbc-sqs','r-sqs-fifo':'dbc-sqs','r-rabbit':'dbc-rabbit','r-redis-stream':'dbc-redis',
+  'r-kafka':'dbc-kafka','r-kafka-streams':'dbc-flink','r-sns-sqs':'dbc-sns','r-rabbit-fanout':'dbc-rabbit',
+  'r-kafka-cdc':'dbc-kafka','r-eventstore':'dbc-eventstore','r-kafka-es':'dbc-kafka','r-kafka-connect':'dbc-kafka',
+  'r-kafka-buffer':'dbc-kafka','r-sqs-buffer':'dbc-sqs','r-leaky-bucket':null
+};
+const totalDepth = 4;
+
+function go(nextId, label) {
+  const cur = document.querySelector('.state.on');
+  history.push({ id: cur.id, label });
+  cur.classList.remove('on');
+  document.getElementById(nextId).classList.add('on');
+  updateUI(nextId);
+}
+
+function goBack() {
+  if (!history.length) return;
+  const prev = history.pop();
+  document.querySelector('.state.on').classList.remove('on');
+  document.getElementById(prev.id).classList.add('on');
+  updateUI(prev.id);
+}
+
+function restart() {
+  history.length = 0;
+  document.querySelector('.state.on').classList.remove('on');
+  document.getElementById('q0').classList.add('on');
+  updateUI('q0');
+}
+
+function updateUI(currentId) {
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = history.map((h, i) =>
+    `<span class="bc-item">${h.label}</span>${i < history.length - 1 ? '<span class="bc-sep">›</span>' : ''}`
+  ).join('');
+
+  const fill = document.getElementById('progress-fill');
+  const label = document.getElementById('step-label');
+  const depth = history.length;
+  const pct = Math.min(100, (depth / totalDepth) * 100);
+  fill.style.width = pct + '%';
+  label.textContent = `step ${depth}`;
+
+  document.querySelectorAll('.db-card').forEach(c => c.classList.remove('highlight'));
+  const hlId = resultHighlights[currentId];
+  if (hlId) {
+    const el = document.getElementById(hlId);
+    if (el) el.classList.add('highlight');
+  }
+
+  const treeNav = document.getElementById('tree-nav');
+  const navItems = [...history.map(h => h.id), currentId];
+  treeNav.innerHTML = navItems.map((id, i) => {
+    const isCurrent = i === navItems.length - 1;
+    const lbl = stateLabels[id] || id;
+    return `<div class="tree-item ${isCurrent ? 'current' : 'visited'}">
+      <div class="tree-dot"></div>${lbl}</div>`;
+  }).join('');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Backspace' || e.key === 'ArrowLeft') { goBack(); return; }
+  const n = parseInt(e.key);
+  if (n >= 1 && n <= 4) {
+    const cur = document.querySelector('.state.on');
+    const opts = cur.querySelectorAll('.opt');
+    if (opts[n - 1]) opts[n - 1].click();
+  }
+});
+
+updateUI('q0');
+</script>
+</body>
+</html>
