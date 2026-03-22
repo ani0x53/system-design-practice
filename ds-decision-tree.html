@@ -29,6 +29,26 @@
     --sans: 'IBM Plex Sans', sans-serif;
   }
 
+  [data-theme="light"] {
+    --bg: #ffffff;
+    --bg2: #f5f5f5;
+    --bg3: #ebebeb;
+    --bg4: #e0e0e0;
+    --border: #d0d0d0;
+    --border2: #bbb;
+    --text: #1a1a1a;
+    --text2: #555;
+    --text3: #888;
+    --accent: #7a6c00;
+    --accent2: #008060;
+    --accent3: #d44a00;
+    --accent4: #7c3aed;
+    --accent5: #0284c7;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
@@ -781,7 +801,32 @@
     gap: 16px;
     flex-wrap: wrap;
   }
+  .theme-toggle {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 1000;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .theme-toggle:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
 </style>
+<script>
+  (function(){
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 </head>
 <body>
 
@@ -2002,6 +2047,29 @@ document.addEventListener('keydown', (e) => {
 });
 
 updateUI('q0');
+</script>
+<button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"></button>
+<script>
+(function(){
+  var btn = document.getElementById('theme-toggle');
+  function label() {
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    btn.textContent = isLight ? '● dark' : '○ light';
+  }
+  label();
+  btn.addEventListener('click', function(){
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    var next = isLight ? 'dark' : 'light';
+    if (next === 'dark') {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+    label();
+  });
+})();
 </script>
 </body>
 </html>
