@@ -1,0 +1,2133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batch Processing — System Design Decision Tree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #111111;
+    --bg3: #181818;
+    --bg4: #1f1f1f;
+    --border: #2a2a2a;
+    --border2: #333;
+    --text: #e8e8e8;
+    --text2: #999;
+    --text3: #666;
+    --accent: #e8ff00;
+    --accent2: #00ffc8;
+    --accent3: #ff6b35;
+    --accent4: #a78bfa;
+    --accent5: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 24px 32px 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .header-left {}
+  .site-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .site-label a {
+    color: var(--text3);
+    text-decoration: none;
+    transition: color .15s;
+  }
+  .site-label a:hover { color: var(--text2); }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -.02em;
+    line-height: 1.2;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .header-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .meta-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    border: 1px solid var(--border2);
+    padding: 3px 8px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .meta-chip .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .progress-track {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .progress-bar {
+    width: 120px;
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width .4s ease;
+    width: 0%;
+  }
+
+  .breadcrumb {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    max-width: 380px;
+    justify-content: flex-end;
+  }
+
+  .bc-item { color: var(--text2); }
+  .bc-sep { color: var(--text3); opacity: .5; }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 280px;
+    min-height: calc(100vh - 89px);
+  }
+
+  /* ── LEFT SIDEBAR ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 89px);
+  }
+
+  .sidebar-section {
+    padding: 0 20px;
+    margin-bottom: 24px;
+  }
+
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .tree-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12px;
+    color: var(--text3);
+    cursor: pointer;
+    transition: color .15s;
+    font-family: var(--mono);
+  }
+
+  .tree-item:hover { color: var(--text2); }
+  .tree-item.visited { color: var(--text2); }
+  .tree-item.current { color: var(--accent); }
+
+  .tree-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--border2);
+    flex-shrink: 0;
+    transition: all .15s;
+  }
+
+  .tree-item.visited .tree-dot { background: var(--text3); border-color: var(--text3); }
+  .tree-item.current .tree-dot { background: var(--accent); border-color: var(--accent); }
+
+  .numbers-ref {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 0 20px 20px;
+  }
+
+  .num-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .num-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+
+  .num-row:last-child { border-bottom: none; }
+
+  .num-k {
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  .num-v {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .num-v.green { color: var(--green); }
+  .num-v.amber { color: var(--amber); }
+  .num-v.red { color: var(--red); }
+
+  /* ── MAIN ── */
+  .main {
+    padding: 32px 36px;
+    max-width: 780px;
+  }
+
+  /* STATE */
+  .state { display: none; }
+  .state.on { display: block; animation: fadeIn .2s ease; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* QUESTION */
+  .q-step {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .q-title {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+
+  .q-subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-bottom: 28px;
+    max-width: 560px;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .opt {
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all .15s;
+    background: var(--bg2);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .opt::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: background .15s;
+  }
+
+  .opt:hover {
+    border-color: var(--border2);
+    background: var(--bg3);
+  }
+
+  .opt:hover::before { background: var(--accent); }
+
+  .opt-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    border: 1px solid var(--border2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    min-width: 24px;
+    text-align: center;
+    transition: all .15s;
+  }
+
+  .opt:hover .opt-key {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .opt-body {}
+
+  .opt-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .opt-sub {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .opt-numbers {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 5px;
+  }
+
+  /* RESULT */
+  .result-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .result-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .result-title-wrap {}
+
+  .result-verdict {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .result-db {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .result-tagline {
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: .02em;
+  }
+
+  .tag-g { background: rgba(74,222,128,.12); color: var(--green); border: 1px solid rgba(74,222,128,.25); }
+  .tag-r { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.25); }
+  .tag-a { background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.25); }
+  .tag-b { background: rgba(56,189,248,.12); color: var(--accent5); border: 1px solid rgba(56,189,248,.25); }
+  .tag-p { background: rgba(167,139,250,.12); color: var(--accent4); border: 1px solid rgba(167,139,250,.25); }
+  .tag-y { background: rgba(232,255,0,.12); color: var(--accent); border: 1px solid rgba(232,255,0,.25); }
+  .tag-t { background: rgba(0,255,200,.12); color: var(--accent2); border: 1px solid rgba(0,255,200,.25); }
+
+  .section-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+
+  .section-block h4 {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .section-block p {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.65;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    gap: 12px;
+  }
+
+  .metric-row:last-child { border-bottom: none; }
+
+  .metric-k {
+    color: var(--text2);
+    flex: 1;
+  }
+
+  .metric-v {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  .metric-v.good { color: var(--green); }
+  .metric-v.warn { color: var(--amber); }
+  .metric-v.bad { color: var(--red); }
+  .metric-v.info { color: var(--accent5); }
+  .metric-v.acc { color: var(--accent); }
+
+  .callout {
+    border-left: 2px solid;
+    padding: 10px 12px;
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .callout.warn {
+    border-color: var(--amber);
+    background: rgba(251,191,36,.06);
+    color: var(--amber);
+  }
+
+  .callout.good {
+    border-color: var(--green);
+    background: rgba(74,222,128,.06);
+    color: #86efac;
+  }
+
+  .callout.info {
+    border-color: var(--accent5);
+    background: rgba(56,189,248,.06);
+    color: #7dd3fc;
+  }
+
+  .callout.danger {
+    border-color: var(--red);
+    background: rgba(248,113,113,.06);
+    color: #fca5a5;
+  }
+
+  .code-block {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 12px 14px;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-top: 8px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .code-block .kw { color: var(--accent4); }
+  .code-block .str { color: var(--accent2); }
+  .code-block .num { color: var(--accent); }
+  .code-block .cm { color: var(--text3); }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .compare-cell {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    background: var(--bg2);
+  }
+
+  .compare-cell h5 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .compare-cell p {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  /* BACK / RESET */
+  .nav-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: .02em;
+  }
+
+  .btn:hover {
+    border-color: var(--text3);
+    color: var(--text2);
+  }
+
+  .btn-primary {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-primary:hover {
+    background: var(--accent);
+    color: #000;
+  }
+
+  /* ── RIGHT PANEL ── */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    padding: 24px 20px;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 89px);
+  }
+
+  .rp-section {
+    margin-bottom: 24px;
+  }
+
+  .rp-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .db-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: var(--bg2);
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .db-card:hover { border-color: var(--border2); background: var(--bg3); }
+  .db-card.highlight { border-color: var(--accent); }
+
+  .db-card-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .db-card.highlight .db-card-name { color: var(--accent); }
+
+  .db-card-meta {
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.4;
+  }
+
+  .db-card-stats {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .db-stat {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    background: var(--bg3);
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+  }
+
+  .rule-item {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+    display: flex;
+    gap: 8px;
+  }
+
+  .rule-item:last-child { border-bottom: none; }
+
+  .rule-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── INTRO ── */
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .intro-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    background: var(--bg2);
+  }
+
+  .intro-card-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .intro-card p {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .big-number {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar, .right-panel { display: none; }
+    .main { max-width: 100%; padding: 24px 20px; }
+  }
+
+  /* Keyboard hint */
+  .kbd-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .kbd {
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 9px;
+    color: var(--text3);
+  }
+
+  /* Footer */
+  .result-footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="site-label"><a href="index.html">System Design Practice</a></div>
+    <h1>Batch Processing — <span>Decision Tree</span></h1>
+    <div class="header-meta">
+      <div class="meta-chip"><div class="dot" style="background:var(--green)"></div> ETL / Data Pipelines</div>
+      <div class="meta-chip"><div class="dot" style="background:var(--amber)"></div> ML/AI Batch Inference</div>
+      <div class="meta-chip"><div class="dot" style="background:var(--accent4)"></div> Orchestration</div>
+      <div class="meta-chip">18 decision paths</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="progress-track">
+      <span id="step-label">step 0</span>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Scale reference</div>
+      <div class="numbers-ref">
+        <div class="num-title">Throughput (records/second)</div>
+        <div class="num-row"><span class="num-k">Spark</span><span class="num-v green">~500k-1M/node</span></div>
+        <div class="num-row"><span class="num-k">Flink (batch)</span><span class="num-v green">~300k-800k/s</span></div>
+        <div class="num-row"><span class="num-k">MapReduce</span><span class="num-v amber">~50k-100k/mapper</span></div>
+        <div class="num-row"><span class="num-k">dbt</span><span class="num-v amber">warehouse-bound</span></div>
+        <div class="num-row"><span class="num-k">Airflow</span><span class="num-v red">orchestrator only</span></div>
+      </div>
+      <div class="numbers-ref">
+        <div class="num-title">Job latency (typical)</div>
+        <div class="num-row"><span class="num-k">Spark batch</span><span class="num-v green">5-30 min</span></div>
+        <div class="num-row"><span class="num-k">MapReduce</span><span class="num-v amber">10-60 min</span></div>
+        <div class="num-row"><span class="num-k">dbt full refresh</span><span class="num-v amber">5-60 min</span></div>
+        <div class="num-row"><span class="num-k">GPU inference</span><span class="num-v green">1-10 min/100k</span></div>
+        <div class="num-row"><span class="num-k">BigQuery on-demand</span><span class="num-v green">sec-minutes</span></div>
+      </div>
+      <div class="numbers-ref">
+        <div class="num-title">Cost reference</div>
+        <div class="num-row"><span class="num-k">Spark (spot)</span><span class="num-v green">~$0.03/node-hr</span></div>
+        <div class="num-row"><span class="num-k">BigQuery</span><span class="num-v amber">$5/TB scanned</span></div>
+        <div class="num-row"><span class="num-k">GPU A100</span><span class="num-v red">~$1.50-3/hr spot</span></div>
+        <div class="num-row"><span class="num-k">Snowflake (med)</span><span class="num-v amber">~$4/credit-hr</span></div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navigation</div>
+      <div id="tree-nav"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- ══ ROOT ══ -->
+    <div id="q0" class="state on">
+      <div class="q-step">Starting point</div>
+      <div class="q-title">What kind of data processing do you need?</div>
+      <div class="q-subtitle">Batch processing handles bounded datasets — you know the input size upfront. The right tool depends on data volume, compute type (CPU vs GPU), and latency tolerance.</div>
+
+      <div class="intro-grid">
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--green)">Signs you need batch</div>
+          <p>Can tolerate minutes-to-hours latency. Processing complete datasets. Training ML models. Generating reports. Backfilling historical data. Cost-sensitive workloads where spot instances change the economics.</p>
+        </div>
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--amber)">Signs you need streaming instead</div>
+          <p>Need sub-second latency. Event-by-event processing. Real-time dashboards. Fraud detection on individual transactions. Continuous data arrival with no natural "batch boundary".</p>
+        </div>
+      </div>
+
+      <div class="kbd-hint"><kbd class="kbd">click</kbd> an option or press <kbd class="kbd">1</kbd> <kbd class="kbd">2</kbd> <kbd class="kbd">3</kbd> <kbd class="kbd">4</kbd></div>
+
+      <div class="options" id="opts-q0">
+        <div class="opt" onclick="go('q1-etl','ETL / Pipeline')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">ETL / Data Pipeline — move and transform data between systems</div>
+            <div class="opt-sub">Extract from source, transform (clean, join, aggregate), load to destination. The bread and butter of data engineering.</div>
+            <div class="opt-numbers">S3 → Spark → warehouse, or warehouse-to-warehouse with dbt</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-inference','ML/AI Inference')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">ML/AI Batch Inference — run model predictions on large datasets</div>
+            <div class="opt-sub">Score millions of items offline. LLM inference, embedding generation, classical ML predictions. GPU-bound or CPU-bound depending on model type.</div>
+            <div class="opt-numbers">Key for Anthropic: LLM batch inference has unique GPU scheduling challenges</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-compute','Computation')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Large-scale computation — MapReduce-style aggregations, analytics</div>
+            <div class="opt-sub">Aggregations, GROUP BY, joins across TB-scale datasets. Graph processing, iterative algorithms, custom per-record transforms.</div>
+            <div class="opt-numbers">Push to warehouse for SQL, Spark for custom code, GraphX for iterative</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-orchestration','Orchestration')">
+          <span class="opt-key">4</span>
+          <div class="opt-body">
+            <div class="opt-title">Orchestration — coordinate multi-step DAGs with dependencies</div>
+            <div class="opt-sub">Schedule jobs, manage dependencies, handle retries, alert on failures. The "glue" that connects your batch jobs into reliable pipelines.</div>
+            <div class="opt-numbers">Airflow, Dagster, Prefect — orchestrators, not executors</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- ETL BRANCH                         -->
+    <!-- ═══════════════════════════════════ -->
+
+    <div id="q1-etl" class="state">
+      <div class="q-step">ETL → step 1 of 2</div>
+      <div class="q-title">Where does the data live and where does it go?</div>
+      <div class="q-subtitle">The source and destination determine the tool. If data is already in a warehouse, transform in-place. If it's in files or an operational DB, you need to move it first.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-dbt','Warehouse transforms')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Warehouse-to-warehouse transforms</div>
+            <div class="opt-sub">Data is already in BigQuery, Snowflake, or Redshift. Transform in-place with SQL. No data movement needed.</div>
+            <div class="opt-numbers">dbt: SQL + Jinja, version-controlled, incremental models</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q2-etl-scale','Lake/files to warehouse')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Lake/files to warehouse</div>
+            <div class="opt-sub">S3/GCS Parquet, JSON, CSV files need to be cleaned, joined, and loaded into structured warehouse tables.</div>
+            <div class="opt-numbers">Volume determines tool: pandas &lt;100GB, Spark 100GB-10TB, warehouse &gt;10TB</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-cdc-batch','Database to lake/warehouse')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Database to lake/warehouse — CDC sync</div>
+            <div class="opt-sub">Sync operational database (Postgres, MySQL) to analytical store. Capture changes, not full snapshots.</div>
+            <div class="opt-numbers">Debezium + Kafka, or managed: Fivetran, Airbyte</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <div id="q2-etl-scale" class="state">
+      <div class="q-step">ETL → Lake/files → step 2 of 2</div>
+      <div class="q-title">What's the data volume per job?</div>
+      <div class="q-subtitle">This is the single most important factor. Don't bring a Spark cluster to a pandas-sized problem, and don't try to process 5TB on a single node.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-simple-etl','< 100 GB')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">&lt; 100 GB per run</div>
+            <div class="opt-sub">Python scripts, pandas, or DuckDB. Single-node processing. No cluster overhead.</div>
+            <div class="opt-numbers">DuckDB: 50GB Parquet aggregation in ~30 seconds on one machine</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-spark-etl','100 GB - 10 TB')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">100 GB – 10 TB per run</div>
+            <div class="opt-sub">Distributed processing with Spark, Dataflow, or EMR. Partition across 10-100 nodes.</div>
+            <div class="opt-numbers">Spark: 1TB join+aggregate in ~8-15 min on 20-node cluster</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-warehouse-etl','> 10 TB')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">&gt; 10 TB per run</div>
+            <div class="opt-sub">Push compute to the warehouse. BigQuery, Snowflake handle petabyte-scale natively with zero cluster management.</div>
+            <div class="opt-numbers">BigQuery: 10TB scan in ~30-90 seconds, $50 cost</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- ML/AI INFERENCE BRANCH             -->
+    <!-- ═══════════════════════════════════ -->
+
+    <div id="q1-inference" class="state">
+      <div class="q-step">ML/AI Inference → step 1 of 2</div>
+      <div class="q-title">What kind of model are you running inference on?</div>
+      <div class="q-subtitle">This is highly relevant for companies like Anthropic — batch inference on LLMs and large models has unique scaling challenges around GPU memory, KV cache management, and continuous batching that don't exist in classical ML.</div>
+      <div class="options">
+        <div class="opt" onclick="go('q2-llm-inference','LLM / Large model')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">LLM / Large model inference</div>
+            <div class="opt-sub">Transformer models requiring GPUs. High memory footprint. Autoregressive generation. KV cache management is the bottleneck, not compute.</div>
+            <div class="opt-numbers">70B model: ~140GB FP16, needs 2x A100-80GB minimum</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-spark-ml','Classical ML')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Classical ML models — sklearn, XGBoost, LightGBM</div>
+            <div class="opt-sub">CPU is enough. Feature engineering is 80% of the job. Model inference is the easy part.</div>
+            <div class="opt-numbers">XGBoost on 100M rows: ~5-10 min on 10-node Spark cluster</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-embedding-batch','Embedding generation')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Embedding generation — vectorize millions of documents</div>
+            <div class="opt-sub">Semantic search, RAG pipelines. Convert text/images to dense vectors. GPU-accelerated but simpler than autoregressive generation.</div>
+            <div class="opt-numbers">sentence-transformers on A100: ~5k embeddings/s, 10M docs in ~30 min</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <div id="q2-llm-inference" class="state">
+      <div class="q-step">ML/AI → LLM → step 2 of 2</div>
+      <div class="q-title">What's your latency and throughput requirement?</div>
+      <div class="q-subtitle">Key tradeoff: larger batches = better GPU utilization but longer time-to-first-result. Continuous batching changes the game by not waiting for the longest sequence in a batch to finish.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-offline-llm','Offline bulk')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Offline bulk scoring — hours of latency is OK</div>
+            <div class="opt-sub">Classify 10M support tickets. Score all products for recommendations. Content moderation backfill. Maximize throughput, minimize cost.</div>
+            <div class="opt-numbers">10M docs x 200 tok avg: ~2B tokens / 300 tok/s = ~77 GPU-hours</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-nearrt-llm','Near-realtime')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Near-realtime — minutes latency</div>
+            <div class="opt-sub">Moderate content within 5 min of posting. Score documents as they arrive. Must balance GPU pool size against SLA.</div>
+            <div class="opt-numbers">Target p99 &lt; 5 min end-to-end for 2k-token generation</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- COMPUTATION BRANCH                 -->
+    <!-- ═══════════════════════════════════ -->
+
+    <div id="q1-compute" class="state">
+      <div class="q-step">Computation → step 1 of 1</div>
+      <div class="q-title">What's the computation pattern?</div>
+      <div class="q-subtitle">SQL-expressible workloads belong in a warehouse. Graph and iterative algorithms need Spark. Custom per-record transforms need distributed execution.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-warehouse-compute','SQL aggregations')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Aggregations / GROUP BY / joins</div>
+            <div class="opt-sub">SQL-expressible computations. Push to BigQuery or Snowflake. Let the warehouse handle parallelism, storage, and optimization.</div>
+            <div class="opt-numbers">BigQuery 10TB scan + aggregate: ~30-90 seconds, ~$50 cost</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-spark-graph','Graph / iterative')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Graph processing / iterative algorithms</div>
+            <div class="opt-sub">PageRank, connected components, shortest paths. Each iteration processes the full graph. Needs BSP or Pregel model.</div>
+            <div class="opt-numbers">PageRank on 1B edges: ~30-60 min on 50 nodes</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-spark-custom','Custom per-record')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Custom code per record</div>
+            <div class="opt-sub">Arbitrary transforms that don't fit SQL. Image processing, NLP preprocessing, complex business logic per record.</div>
+            <div class="opt-numbers">Spark UDFs or mapPartitions — watch for Python serialization overhead</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- ORCHESTRATION BRANCH               -->
+    <!-- ═══════════════════════════════════ -->
+
+    <div id="q1-orchestration" class="state">
+      <div class="q-step">Orchestration → step 1 of 1</div>
+      <div class="q-title">How complex is your DAG?</div>
+      <div class="q-subtitle">Orchestrators are the "air traffic control" for batch jobs. They don't execute heavy processing themselves — they trigger and coordinate other systems.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-simple-orchestration','Simple pipeline')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Linear pipeline, &lt; 20 tasks</div>
+            <div class="opt-sub">A few steps in sequence. No complex branching. Small team, want minimal infrastructure overhead.</div>
+            <div class="opt-numbers">Cron + scripts, or Prefect for Python-native orchestration</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-airflow','Complex DAG')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Complex DAG — dependencies, retries, SLAs</div>
+            <div class="opt-sub">Dozens to hundreds of tasks. Cross-team dependencies. Need retry policies, alerting, backfill capabilities, audit logging.</div>
+            <div class="opt-numbers">Airflow with CeleryExecutor: 1000s of DAGs, 100k+ task instances/day</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-ml-orchestration','ML pipeline')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">ML-specific: training + evaluation + deployment</div>
+            <div class="opt-sub">End-to-end ML lifecycle. Needs experiment tracking, model registry, automated retraining triggers, A/B deployment.</div>
+            <div class="opt-numbers">Kubeflow, SageMaker Pipelines, or MLflow for model lifecycle</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn" onclick="restart()">Restart</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- RESULTS                            -->
+    <!-- ═══════════════════════════════════ -->
+
+    <!-- dbt -->
+    <div id="r-dbt" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(74,222,128,.15); color:var(--green);">dbt</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">dbt (Data Build Tool)</div>
+          <div class="result-tagline" style="color:var(--text2)">SQL-first transforms where your data already lives</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">SQL-first</span>
+        <span class="tag tag-b">warehouse-native</span>
+        <span class="tag tag-t">version-controlled</span>
+        <span class="tag tag-p">incremental</span>
+      </div>
+      <div class="section-block">
+        <h4>Why dbt</h4>
+        <p>Transform where data already lives. No data movement. SQL + Jinja templating gives you modularity and DRY principles in SQL. Tests are built in — schema tests, data tests, freshness checks. Git-based workflow means PRs, code review, and CI/CD for your data transformations. Incremental models avoid full table scans by only processing new/changed rows.</p>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">Full refresh on 1B rows (BigQuery)</span><span class="metric-v info">~5-15 minutes</span></div>
+        <div class="metric-row"><span class="metric-k">Incremental on 10M new rows</span><span class="metric-v good">~30-60 seconds</span></div>
+        <div class="metric-row"><span class="metric-k">Cluster cost</span><span class="metric-v good">none — warehouse compute only</span></div>
+        <div class="metric-row"><span class="metric-k">Supported warehouses</span><span class="metric-v info">Snowflake, BigQuery, Redshift, Databricks, Postgres</span></div>
+        <div class="metric-row"><span class="metric-k">Testing</span><span class="metric-v good">schema + data + freshness built-in</span></div>
+      </div>
+      <div class="section-block">
+        <h4>When dbt breaks down</h4>
+        <p>Unstructured data (images, audio, PDFs) — dbt is SQL-only. Python-heavy transformations — though dbt Python models exist, they're limited and run as warehouse-side Python which is slow. Real-time / sub-minute freshness — dbt is batch, not streaming. Complex stateful transforms — anything that needs iteration or recursion doesn't fit the SQL model.</p>
+      </div>
+      <div class="section-block">
+        <h4>Incremental model example</h4>
+        <div class="code-block"><span class="cm">-- models/orders_daily.sql</span>
+{{ <span class="kw">config</span>(
+    <span class="str">materialized='incremental'</span>,
+    <span class="str">unique_key='order_id'</span>,
+    <span class="str">partition_by={'field': 'order_date', 'data_type': 'date'}</span>
+) }}
+
+<span class="kw">SELECT</span>
+    order_id,
+    customer_id,
+    <span class="kw">SUM</span>(amount) <span class="kw">as</span> total_amount,
+    order_date
+<span class="kw">FROM</span> {{ <span class="str">ref('stg_orders')</span> }}
+
+{% <span class="kw">if</span> is_incremental() %}
+    <span class="kw">WHERE</span> order_date &gt; (<span class="kw">SELECT</span> <span class="kw">MAX</span>(order_date) <span class="kw">FROM</span> {{ <span class="str">this</span> }})
+{% <span class="kw">endif</span> %}
+
+<span class="kw">GROUP BY</span> <span class="num">1</span>, <span class="num">2</span>, <span class="num">4</span></div>
+      </div>
+      <div class="callout good">dbt + BigQuery is probably the most cost-effective batch pipeline for structured data under 10TB. No clusters to manage, pay per query. A 1B-row incremental model costs pennies per run.</div>
+      <div class="callout warn">dbt doesn't handle orchestration well on its own. Pair with Airflow or Dagster for scheduling, alerting, and dependency management across projects. dbt Cloud adds scheduling but at $100/seat/month.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: ETL → warehouse transforms</span>
+      </div>
+    </div>
+
+    <!-- Spark ETL -->
+    <div id="r-spark-etl" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(255,107,53,.15); color:var(--accent3);">SPK</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Apache Spark (EMR / Dataproc / Databricks)</div>
+          <div class="result-tagline" style="color:var(--text2)">Distributed compute for 100GB-10TB data pipelines</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">distributed</span>
+        <span class="tag tag-b">fault-tolerant</span>
+        <span class="tag tag-t">partitioned</span>
+        <span class="tag tag-a">TB-scale</span>
+      </div>
+      <div class="section-block">
+        <h4>Why Spark</h4>
+        <p>Distributed processing across 100s of nodes with automatic fault tolerance (RDD lineage). Handles semi-structured data natively — JSON, Parquet, Avro, ORC. Lazy evaluation + Catalyst query optimizer generate efficient execution plans. Exactly-once semantics with checkpointing. Rich ecosystem: Spark SQL, MLlib, GraphX, Structured Streaming. Python (PySpark), Scala, Java, R APIs.</p>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">1 TB Parquet join + aggregate</span><span class="metric-v good">~8-15 min on 20 nodes</span></div>
+        <div class="metric-row"><span class="metric-k">Shuffle-heavy join on 10 TB</span><span class="metric-v warn">~30-60 min on 50 nodes</span></div>
+        <div class="metric-row"><span class="metric-k">Single node memory</span><span class="metric-v info">16-64 GB typical, spills to disk</span></div>
+        <div class="metric-row"><span class="metric-k">Cost (EMR spot)</span><span class="metric-v good">~$0.03/node-hour</span></div>
+        <div class="metric-row"><span class="metric-k">Cost (Databricks)</span><span class="metric-v warn">~$0.10-0.40/DBU</span></div>
+        <div class="metric-row"><span class="metric-k">Throughput per node</span><span class="metric-v good">~500k-1M rec/s</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Failure modes — what interviewers ask about</h4>
+        <p><strong>Data skew:</strong> One partition has 100x more data than others. One task takes 100x longer while 99 executors sit idle. Fix: salted keys, repartition, broadcast join for small tables (&lt;100MB). Always check key distribution before large joins.</p>
+        <p style="margin-top:8px"><strong>Shuffle spills:</strong> Insufficient memory during shuffle stage. Data spills from memory to disk, causing 10x slowdown. Fix: increase spark.sql.shuffle.partitions (default 200 is often too low), more executor memory, or pre-aggregate before the join.</p>
+        <p style="margin-top:8px"><strong>Small files problem:</strong> 100k tiny Parquet files in S3. More time scheduling and opening files than actually computing. Fix: coalesce/repartition before write, run compaction jobs, use Delta Lake auto-optimize.</p>
+        <p style="margin-top:8px"><strong>OOM on driver:</strong> Calling collect() on a large dataset pulls everything to driver memory. Fix: never collect() on large datasets, use distributed aggregations, increase driver memory only as last resort.</p>
+        <p style="margin-top:8px"><strong>Stragglers:</strong> One slow task blocks the entire stage. Fix: speculative execution (spark.speculation=true) runs duplicate tasks, but doubles resource usage. Better: fix the root cause (skew, slow node).</p>
+      </div>
+      <div class="compare-grid">
+        <div class="compare-cell">
+          <h5 style="color:var(--accent3)">Spark</h5>
+          <p>Mature ecosystem. Excellent SQL support via Spark SQL. Python-friendly (PySpark). Huge community. Best for batch ETL and ad-hoc analytics.</p>
+        </div>
+        <div class="compare-cell">
+          <h5 style="color:var(--accent5)">Flink (batch mode)</h5>
+          <p>Better for unified batch+stream. True exactly-once semantics. Lower latency for near-realtime. But smaller ecosystem, steeper learning curve, less Python support.</p>
+        </div>
+      </div>
+      <div class="callout danger">The #1 Spark failure in production is data skew. If your join key is user_id and 5% of users generate 80% of events, one executor processes 80% of the data while 99 others sit idle. Always check key distribution before large joins.</div>
+      <div class="callout info">Consider Delta Lake or Apache Iceberg on top of Spark for ACID transactions, schema evolution, and time travel on your data lake. These table formats eliminate the small files problem and enable incremental processing.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: ETL → lake/files → 100GB-10TB</span>
+      </div>
+    </div>
+
+    <!-- Simple ETL -->
+    <div id="r-simple-etl" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.15); color:var(--accent5);">DDB</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Lightweight ETL (Python + DuckDB / Pandas)</div>
+          <div class="result-tagline" style="color:var(--text2)">Single-node processing for sub-100GB datasets</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">zero cluster overhead</span>
+        <span class="tag tag-b">single-node</span>
+        <span class="tag tag-t">DuckDB / pandas</span>
+        <span class="tag tag-p">fast iteration</span>
+      </div>
+      <div class="section-block">
+        <h4>Why lightweight ETL</h4>
+        <p>For datasets under 100GB, you often don't need Spark at all. DuckDB is an in-process OLAP engine that processes Parquet files directly from S3 with zero infrastructure. It uses columnar execution, vectorized processing, and automatic parallelism. pandas works for &lt;10GB in-memory. Polars is the modern alternative to pandas — 10-100x faster due to Rust backend and lazy evaluation.</p>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">DuckDB: 50GB Parquet aggregation</span><span class="metric-v good">~30 seconds (r5.2xlarge)</span></div>
+        <div class="metric-row"><span class="metric-k">pandas: same 50GB data</span><span class="metric-v bad">OOM or 10+ minutes</span></div>
+        <div class="metric-row"><span class="metric-k">Polars: same 50GB data</span><span class="metric-v good">~45 seconds</span></div>
+        <div class="metric-row"><span class="metric-k">Cluster setup time</span><span class="metric-v good">0 (no cluster)</span></div>
+        <div class="metric-row"><span class="metric-k">Cost</span><span class="metric-v good">single EC2 instance only</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Failure modes</h4>
+        <p><strong>OOM:</strong> The main failure mode. No distributed recovery — if you run out of memory, the job dies. DuckDB can spill to disk but with performance penalty. Fix: monitor memory, use streaming/chunked reads for very large files, or upgrade to a bigger instance before reaching for Spark.</p>
+        <p style="margin-top:8px"><strong>No fault tolerance:</strong> If the machine dies mid-job, you restart from scratch. Fine for 30-second jobs, unacceptable for 30-minute jobs. This is where the boundary with Spark lives — if single-node failure is costly, go distributed.</p>
+      </div>
+      <div class="callout good">Before reaching for Spark, try DuckDB. It's embarrassingly fast for single-node analytics and has zero cluster overhead. A $2/hr EC2 instance running DuckDB can replace a $50/hr Spark cluster for most sub-100GB workloads.</div>
+      <div class="callout info">DuckDB can query Parquet files directly in S3 without downloading them first: SELECT * FROM read_parquet('s3://bucket/data/*.parquet'). This is a game-changer for exploratory analytics.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: ETL → lake/files → &lt;100GB</span>
+      </div>
+    </div>
+
+    <!-- Warehouse ETL (>10TB) -->
+    <div id="r-warehouse-etl" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.15); color:var(--accent);">BQ</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Push Compute to Warehouse (BigQuery / Snowflake)</div>
+          <div class="result-tagline" style="color:var(--text2)">Let the warehouse handle petabyte-scale ETL</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">serverless</span>
+        <span class="tag tag-y">petabyte-scale</span>
+        <span class="tag tag-b">zero cluster management</span>
+        <span class="tag tag-t">SQL-native</span>
+      </div>
+      <div class="section-block">
+        <h4>Why push to warehouse</h4>
+        <p>At &gt;10TB, the cost of moving data out of the warehouse to process it in Spark exceeds the cost of just processing it in-place. BigQuery and Snowflake are optimized for exactly this: they separate compute from storage, auto-scale parallelism, and handle petabyte-scale joins natively. You pay for compute time, not cluster idle time.</p>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">BigQuery 10TB scan + aggregation</span><span class="metric-v good">~30-90 seconds</span></div>
+        <div class="metric-row"><span class="metric-k">BigQuery cost for 10TB scan</span><span class="metric-v warn">~$50 on-demand</span></div>
+        <div class="metric-row"><span class="metric-k">Snowflake 4XL same workload</span><span class="metric-v warn">~2-5 min, ~$100-200</span></div>
+        <div class="metric-row"><span class="metric-k">BigQuery flat-rate</span><span class="metric-v info">$2k/month for 100 slots</span></div>
+        <div class="metric-row"><span class="metric-k">Data egress cost</span><span class="metric-v bad">$0.12/GB — another reason to stay in-warehouse</span></div>
+      </div>
+      <div class="section-block">
+        <h4>External table loading</h4>
+        <div class="code-block"><span class="cm">-- BigQuery: load Parquet from GCS as external table, then transform in-place</span>
+<span class="kw">CREATE OR REPLACE EXTERNAL TABLE</span> raw.events
+<span class="kw">OPTIONS</span> (
+  format = <span class="str">'PARQUET'</span>,
+  uris = [<span class="str">'gs://bucket/events/*.parquet'</span>]
+);
+
+<span class="cm">-- Transform and materialize</span>
+<span class="kw">CREATE OR REPLACE TABLE</span> analytics.events_daily
+<span class="kw">PARTITION BY</span> event_date
+<span class="kw">CLUSTER BY</span> user_id <span class="kw">AS</span>
+<span class="kw">SELECT</span>
+  DATE(event_timestamp) <span class="kw">as</span> event_date,
+  user_id,
+  event_type,
+  <span class="kw">COUNT</span>(*) <span class="kw">as</span> event_count
+<span class="kw">FROM</span> raw.events
+<span class="kw">GROUP BY</span> <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>;</div>
+      </div>
+      <div class="callout good">If your batch job is expressible in SQL, don't use Spark. Warehouses are optimized for exactly this and require zero cluster management. The operational simplicity alone is worth the slightly higher per-query cost.</div>
+      <div class="callout warn">Watch out for on-demand pricing at scale. If you're scanning 10TB+ daily, switch to flat-rate/reserved pricing. BigQuery on-demand at 100TB/day = $500/day = $15k/month. Flat-rate at $2k/month is 7.5x cheaper.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: ETL → lake/files → &gt;10TB</span>
+      </div>
+    </div>
+
+    <!-- CDC Batch -->
+    <div id="r-cdc-batch" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(167,139,250,.15); color:var(--accent4);">CDC</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">CDC-based Batch Sync (Debezium / Fivetran)</div>
+          <div class="result-tagline" style="color:var(--text2)">Capture database changes, load to analytical store on schedule</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">change capture</span>
+        <span class="tag tag-b">incremental sync</span>
+        <span class="tag tag-p">log-based</span>
+        <span class="tag tag-a">150+ connectors</span>
+      </div>
+      <div class="section-block">
+        <h4>Why CDC batch sync</h4>
+        <p>Instead of full table dumps (slow, expensive, blocks the source DB), CDC reads the database's WAL/binlog to capture only changed rows. This is non-intrusive to the source DB, captures deletes (which query-based sync misses), and is much faster for large tables where only a small fraction changes per sync window.</p>
+      </div>
+      <div class="section-block">
+        <h4>Architecture options</h4>
+        <div class="metric-row"><span class="metric-k">Self-hosted: Debezium → Kafka → batch consumer</span><span class="metric-v info">hourly/daily warehouse loads</span></div>
+        <div class="metric-row"><span class="metric-k">Managed: Fivetran / Airbyte</span><span class="metric-v good">150+ connectors, managed</span></div>
+        <div class="metric-row"><span class="metric-k">Fivetran: 50M rows/day from Postgres</span><span class="metric-v good">~15 min sync window</span></div>
+        <div class="metric-row"><span class="metric-k">Debezium latency to Kafka</span><span class="metric-v good">sub-second</span></div>
+        <div class="metric-row"><span class="metric-k">Fivetran pricing</span><span class="metric-v warn">$1-2/credit (per million rows)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Failure modes</h4>
+        <p><strong>WAL retention:</strong> If your CDC consumer falls behind and the database has rotated its WAL, you lose change events. Fix: set wal_keep_size high enough, monitor consumer lag, alert if lag exceeds retention window.</p>
+        <p style="margin-top:8px"><strong>Schema drift:</strong> Source DB schema changes break the sync. A column rename or type change can cause silent data loss. Fix: schema registry, automated schema evolution detection, dbt tests on destination tables.</p>
+      </div>
+      <div class="callout info">For most teams, Fivetran or Airbyte is the right choice over self-hosted Debezium. The operational overhead of running Debezium + Kafka + batch consumer is significant. Managed CDC lets you focus on the transforms, not the plumbing.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: ETL → database to lake/warehouse</span>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- ML/AI RESULTS                      -->
+    <!-- ═══════════════════════════════════ -->
+
+    <!-- OFFLINE LLM BATCH INFERENCE — THE KEY RESULT -->
+    <div id="r-offline-llm" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(248,113,113,.15); color:var(--red);">GPU</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent)">Critical for Anthropic interview</div>
+          <div class="result-db">Offline LLM Batch Inference</div>
+          <div class="result-tagline" style="color:var(--text2)">Maximize GPU utilization for bulk model scoring at scale</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-r">GPU-bound</span>
+        <span class="tag tag-y">continuous batching</span>
+        <span class="tag tag-a">memory-bound</span>
+        <span class="tag tag-p">KV cache</span>
+        <span class="tag tag-t">vLLM / TGI</span>
+      </div>
+      <div class="section-block">
+        <h4>The challenge</h4>
+        <p>LLM inference is fundamentally different from classical ML batch. Autoregressive generation means each token depends on all previous tokens — you can't parallelize within a single sequence. Memory scales with sequence length due to the KV cache (storing key/value pairs for attention). GPU utilization is typically 30-60% for naive static batching because shorter sequences pad to the longest sequence length, wasting compute.</p>
+      </div>
+      <div class="section-block">
+        <h4>Architecture</h4>
+        <div class="code-block"><span class="cm">// High-level batch inference pipeline</span>
+<span class="kw">Input Store</span> (S3/GCS)
+    ↓ partitioned by estimated sequence length
+<span class="kw">Job Queue</span> (SQS / Redis)
+    ↓ work items with priority + metadata
+<span class="kw">Scheduler</span> (continuous batching)
+    ↓ packs requests into GPU memory dynamically
+<span class="kw">GPU Worker Pool</span> (vLLM / TGI / TensorRT-LLM)
+    │ prefill: compute-bound (~10k tok/s on A100 for 70B)
+    │ decode:  memory-bandwidth-bound (~300-500 tok/s)
+    ↓
+<span class="kw">Output Store</span> (S3/GCS/database)
+    ↓ checkpointed, idempotent writes
+<span class="kw">Monitoring</span> (tokens/s, GPU util, queue depth, error rate)</div>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">70B model memory (FP16)</span><span class="metric-v bad">~140 GB → 2x A100-80GB</span></div>
+        <div class="metric-row"><span class="metric-k">70B model memory (INT4 quantized)</span><span class="metric-v warn">~35 GB → 1x A100-80GB</span></div>
+        <div class="metric-row"><span class="metric-k">Throughput (70B, A100, large batch)</span><span class="metric-v info">~100-500 tok/s per GPU</span></div>
+        <div class="metric-row"><span class="metric-k">Prefill throughput (70B, A100)</span><span class="metric-v good">~10k tok/s (compute-bound)</span></div>
+        <div class="metric-row"><span class="metric-k">Decode throughput (70B, A100)</span><span class="metric-v warn">~300-500 tok/s (mem-BW bound)</span></div>
+        <div class="metric-row"><span class="metric-k">10M docs x 200 tok output</span><span class="metric-v info">~2B tokens total</span></div>
+        <div class="metric-row"><span class="metric-k">Time at 300 tok/s per GPU</span><span class="metric-v warn">~77 GPU-hours</span></div>
+        <div class="metric-row"><span class="metric-k">Cost (A100 spot ~$1.50/hr)</span><span class="metric-v good">~$115-230 total</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Key optimizations — know these cold</h4>
+        <p><strong>Continuous batching:</strong> Don't block on the longest sequence. As sequences finish generating, immediately slot in new requests from the queue. This is the single biggest optimization — 2-4x throughput improvement over static batching. vLLM and TGI implement this natively.</p>
+        <p style="margin-top:8px"><strong>PagedAttention (vLLM):</strong> Treats the KV cache like virtual memory. Instead of pre-allocating contiguous memory for max sequence length, it allocates in pages on demand. Eliminates internal fragmentation, allows much larger batch sizes. This alone can double throughput by fitting 2x more requests in GPU memory.</p>
+        <p style="margin-top:8px"><strong>Quantization:</strong> INT8 reduces memory 2x with &lt;0.5% quality loss for most tasks. INT4 (GPTQ, AWQ) reduces 4x with &lt;1% quality loss. Fits 70B model on a single A100-80GB in INT4. Always benchmark quality on YOUR specific task — classification may be fine, creative writing may degrade.</p>
+        <p style="margin-top:8px"><strong>Speculative decoding:</strong> A small "draft" model (7B) proposes N tokens, the main model (70B) verifies all N in a single forward pass. If the draft model guesses correctly (common for easy tokens), you get N tokens for the cost of 1 main model step. 2-3x speedup for greedy/low-temperature decoding.</p>
+        <p style="margin-top:8px"><strong>Tensor parallelism:</strong> Split model layers across GPUs with NVLink. 70B on 4 GPUs = ~4x memory capacity but only ~2-3x throughput due to inter-GPU communication. Use pipeline parallelism (split layers) for batch inference to overlap compute and communication.</p>
+      </div>
+      <div class="section-block">
+        <h4>Failure modes — interview gold</h4>
+        <p><strong>OOM on long sequences:</strong> KV cache grows linearly with sequence length. A few 32k-token requests mixed with 1k-token requests can OOM the GPU. Fix: sequence length limits per request, dynamic batching that tracks available KV cache memory (vLLM does this), separate queues for long vs short sequences.</p>
+        <p style="margin-top:8px"><strong>GPU idle during prefill:</strong> Prefill (processing the prompt) is compute-bound. If your batch has mixed prompt lengths, shorter prompts finish prefill and wait. Fix: sort requests by prompt length, use bucketed batching. In continuous batching, prefill of new requests interleaves with decode of existing ones — called "chunked prefill".</p>
+        <p style="margin-top:8px"><strong>Checkpoint/restart:</strong> GPU spot instances get reclaimed (2-minute warning on AWS). NCCL timeouts crash multi-GPU jobs. Fix: checkpoint completed items to S3/GCS after each batch, make processing idempotent (store results keyed by input hash), resume from last checkpoint on restart.</p>
+        <p style="margin-top:8px"><strong>Result poisoning:</strong> One malformed input (encoding error, adversarial prompt, extreme length) crashes the batch worker. Fix: input validation + sanitization before queuing, per-item try/catch in the worker, quarantine failed items to a dead-letter queue with the error for investigation.</p>
+        <p style="margin-top:8px"><strong>Throughput cliff:</strong> Batch size too large causes KV cache to exceed GPU memory. Instead of OOM, some frameworks fall back to recomputation (recomputing KV pairs instead of caching them). This causes a 10x throughput drop with no visible error. Fix: monitor GPU memory utilization (not just compute utilization), set explicit max_num_seqs in vLLM, profile the memory-throughput curve for your specific model.</p>
+      </div>
+      <div class="callout danger">The single biggest mistake in LLM batch inference: treating it like classical ML batch. In classical ML, bigger batch = always better GPU utilization. In LLMs, batch size is constrained by KV cache memory, not compute. Going 1 item over the memory threshold can drop throughput by 10x due to recomputation fallback.</div>
+      <div class="callout info">For Anthropic-scale inference: the system design question is really about scheduling. How do you maximize GPU utilization across thousands of heterogeneous requests with different prompt lengths, different output lengths, different priority levels? This is essentially a bin-packing problem with a time dimension. The scheduler must balance: (1) GPU memory for KV cache, (2) compute budget for prefill vs decode, (3) SLA deadlines, (4) cost (spot vs on-demand).</div>
+      <div class="callout warn">Always measure tokens/second/dollar, not just tokens/second. A 70B model on 2x A100 at 300 tok/s costs $3/hr = $0.0028 per 1k tokens. The same model quantized to INT4 on 1x A100 at 250 tok/s costs $1.50/hr = $0.0017 per 1k tokens — 40% cheaper even though raw throughput is lower.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: ML/AI → LLM → offline bulk scoring</span>
+      </div>
+    </div>
+
+    <!-- Near-realtime LLM -->
+    <div id="r-nearrt-llm" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(251,191,36,.15); color:var(--amber);">NRT</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Near-Realtime LLM Inference Pipeline</div>
+          <div class="result-tagline" style="color:var(--text2)">Minutes-latency LLM processing with auto-scaling GPU pool</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-a">minutes-latency</span>
+        <span class="tag tag-r">GPU auto-scaling</span>
+        <span class="tag tag-b">SLA-driven</span>
+        <span class="tag tag-t">queue-based</span>
+      </div>
+      <div class="section-block">
+        <h4>When you need minutes, not hours</h4>
+        <p>Content moderation within 5 min of posting. Document classification as they arrive. The key difference from offline bulk: you must right-size your GPU pool to meet an SLA, not just maximize throughput. Over-provisioning wastes expensive GPU time. Under-provisioning means SLA violations and growing queues.</p>
+      </div>
+      <div class="section-block">
+        <h4>Architecture</h4>
+        <div class="code-block"><span class="kw">Kafka / SQS</span> (input queue)
+    ↓ partitioned by priority
+<span class="kw">Auto-scaling GPU Pool</span> (EKS / GKE + vLLM)
+    │ scale trigger: queue_depth &gt; threshold for &gt; 2 min
+    │ scale-down delay: 10 min (GPU startup is ~2-5 min)
+    │ min replicas: enough for baseline traffic
+    ↓
+<span class="kw">Result Topic / Table</span>
+    ↓ consumer reads results, updates downstream
+
+<span class="cm">// Key metric: time_in_queue + inference_time &lt; SLA</span>
+<span class="cm">// If queue_time dominates → need more GPU replicas</span>
+<span class="cm">// If inference_time dominates → need faster model/hardware</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">Target end-to-end latency</span><span class="metric-v good">p99 &lt; 5 min</span></div>
+        <div class="metric-row"><span class="metric-k">Cold start (model loading)</span><span class="metric-v bad">30s-2 min for 70B model</span></div>
+        <div class="metric-row"><span class="metric-k">Container pull + model load</span><span class="metric-v bad">2-5 min total</span></div>
+        <div class="metric-row"><span class="metric-k">GPU scale-up time</span><span class="metric-v warn">3-7 min (instance + container + model)</span></div>
+        <div class="metric-row"><span class="metric-k">Queue depth monitoring interval</span><span class="metric-v info">30 seconds</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Failure modes</h4>
+        <p><strong>Cold start latency:</strong> Loading a 70B model into GPU memory takes 30s-2min. If you scale to zero and traffic arrives, the first request waits 5+ minutes. Fix: always keep minimum replicas warm, pre-pull container images to GPU nodes, use model caching on local NVMe.</p>
+        <p style="margin-top:8px"><strong>Queue backup during spikes:</strong> Traffic 10x spikes (e.g., viral content needing moderation). GPU scaling is slow (minutes). Fix: pre-computed scale targets based on queue growth rate, not just depth. If queue is growing at 1000 items/min and you process 100/min/GPU, you need 10 more GPUs NOW, not when queue hits threshold.</p>
+        <p style="margin-top:8px"><strong>Priority inversion:</strong> Low-priority bulk items fill the queue, high-priority items wait behind them. Fix: separate queues per priority, or priority-aware scheduling that preempts low-priority batches.</p>
+      </div>
+      <div class="callout warn">Scale on queue depth growth rate, not absolute depth. By the time queue depth hits a static threshold, you're already behind. Predictive scaling based on arrival rate vs processing rate catches spikes 5-10 minutes earlier.</div>
+      <div class="callout info">Consider keeping a "warm pool" of GPU instances with models loaded but not actively processing. They cost money but eliminate cold start. For a 5-minute SLA, cold start of 3-5 minutes leaves almost no room for actual inference.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: ML/AI → LLM → near-realtime</span>
+      </div>
+    </div>
+
+    <!-- Spark ML / Classical -->
+    <div id="r-spark-ml" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(0,255,200,.15); color:var(--accent2);">ML</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Spark ML / Classical ML Batch Inference</div>
+          <div class="result-tagline" style="color:var(--text2)">Feature engineering + CPU-based model scoring at scale</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">CPU-sufficient</span>
+        <span class="tag tag-b">feature-heavy</span>
+        <span class="tag tag-t">sklearn / XGBoost</span>
+        <span class="tag tag-p">Spark MLlib</span>
+      </div>
+      <div class="section-block">
+        <h4>Why Spark for classical ML</h4>
+        <p>For classical ML (XGBoost, LightGBM, sklearn), inference is CPU-bound and fast — the bottleneck is feature engineering, not prediction. Typical pattern: Spark for distributed feature engineering (joins, aggregations, window functions across TB of data), then broadcast the trained model to all executors for parallel prediction. Feature engineering is usually 80% of the total job time.</p>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">XGBoost inference on 100M rows</span><span class="metric-v good">~5-10 min on 10 nodes</span></div>
+        <div class="metric-row"><span class="metric-k">Feature engineering on 1TB</span><span class="metric-v warn">~20-40 min on 20 nodes</span></div>
+        <div class="metric-row"><span class="metric-k">sklearn predict (per node)</span><span class="metric-v good">~100k-1M predictions/s</span></div>
+        <div class="metric-row"><span class="metric-k">Model broadcast overhead</span><span class="metric-v good">seconds (model is small, &lt;1GB)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Pattern</h4>
+        <div class="code-block"><span class="cm"># Typical Spark + sklearn batch inference</span>
+<span class="kw">import</span> pyspark.sql.functions <span class="kw">as</span> F
+<span class="kw">from</span> pyspark.sql <span class="kw">import</span> SparkSession
+
+<span class="cm"># 1. Feature engineering in Spark (the slow part)</span>
+features_df = (
+    raw_events
+    .groupBy(<span class="str">"user_id"</span>)
+    .agg(
+        F.count(<span class="str">"*"</span>).alias(<span class="str">"event_count"</span>),
+        F.avg(<span class="str">"session_duration"</span>).alias(<span class="str">"avg_session"</span>),
+        F.countDistinct(<span class="str">"page_id"</span>).alias(<span class="str">"unique_pages"</span>)
+    )
+)
+
+<span class="cm"># 2. Broadcast model to all executors</span>
+model_broadcast = spark.sparkContext.broadcast(trained_model)
+
+<span class="cm"># 3. Predict with UDF (the fast part)</span>
+@F.udf(<span class="str">"double"</span>)
+<span class="kw">def</span> predict(features):
+    <span class="kw">return</span> float(model_broadcast.value.predict([features])[<span class="num">0</span>])</div>
+      </div>
+      <div class="callout info">Consider using Spark's mapInPandas() or mapInArrow() instead of row-level UDFs. These process data in batches (Arrow RecordBatches), avoiding Python serialization overhead. 10-100x faster than row-level UDFs for sklearn/XGBoost inference.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: ML/AI → classical ML</span>
+      </div>
+    </div>
+
+    <!-- Embedding Batch -->
+    <div id="r-embedding-batch" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(167,139,250,.15); color:var(--accent4);">EMB</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Batch Embedding Generation</div>
+          <div class="result-tagline" style="color:var(--text2)">Vectorize millions of documents for semantic search and RAG</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-p">GPU-accelerated</span>
+        <span class="tag tag-b">vector output</span>
+        <span class="tag tag-t">RAG / search</span>
+        <span class="tag tag-a">model-versioned</span>
+      </div>
+      <div class="section-block">
+        <h4>Why batch embeddings</h4>
+        <p>Semantic search, RAG pipelines, recommendation systems, and duplicate detection all require dense vector representations of text/images. Embedding models (sentence-transformers, OpenAI ada-002, Cohere) convert documents into fixed-size vectors. Unlike autoregressive LLMs, embedding models process the full input in a single forward pass — much simpler to batch and parallelize.</p>
+      </div>
+      <div class="section-block">
+        <h4>Architecture</h4>
+        <div class="code-block"><span class="kw">Document Store</span> (S3 / database)
+    ↓
+<span class="kw">Chunking Pipeline</span> (split docs into ~512 token chunks)
+    ↓
+<span class="kw">GPU Embedding Workers</span> (sentence-transformers / TGI)
+    │ batch_size=256, process in parallel
+    ↓
+<span class="kw">Vector DB</span> (Pinecone / Weaviate / pgvector / Qdrant)
+    │ store: (doc_id, chunk_id, vector, metadata, model_version)
+    ↓
+<span class="kw">Search API</span> (query → embed → ANN search → retrieve)</div>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">sentence-transformers on A100</span><span class="metric-v good">~5k embeddings/s (384-dim)</span></div>
+        <div class="metric-row"><span class="metric-k">10M documents self-hosted</span><span class="metric-v good">~30 min on A100</span></div>
+        <div class="metric-row"><span class="metric-k">OpenAI API rate limit</span><span class="metric-v bad">~3k/min → 10M docs = ~55 hours</span></div>
+        <div class="metric-row"><span class="metric-k">OpenAI API cost (ada-002)</span><span class="metric-v bad">~$1.30 per 1M tokens</span></div>
+        <div class="metric-row"><span class="metric-k">Self-hosted GPU cost</span><span class="metric-v good">~$1.50/hr → $0.75 for 10M docs</span></div>
+        <div class="metric-row"><span class="metric-k">Vector storage (1B x 384-dim float32)</span><span class="metric-v warn">~1.5 TB raw</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Critical failure mode: model version drift</h4>
+        <p>If you update the embedding model (new version, different dimensions, fine-tuned weights), ALL existing vectors become incompatible. You cannot mix vectors from different model versions in the same index — cosine similarity between v1 and v2 embeddings is meaningless. Plan for full reindex: maintain a mapping of model_version → vector_index, and run the new embedding batch in parallel before switching the search API to the new index.</p>
+      </div>
+      <div class="callout warn">For RAG systems, embedding generation is the batch job that directly impacts retrieval quality. Always version your embedding model and maintain a mapping of model_version → vector_index. A model update means a full reindex — budget GPU time and cost accordingly.</div>
+      <div class="callout good">Self-hosted embeddings are 50-100x cheaper than API-based for large batches. 10M documents via OpenAI API: ~55 hours + ~$500. Self-hosted on A100: ~30 minutes + ~$0.75. The API only makes sense for &lt;100k documents or when you can't manage GPU infrastructure.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: ML/AI → embedding generation</span>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- COMPUTATION RESULTS                -->
+    <!-- ═══════════════════════════════════ -->
+
+    <!-- Warehouse Compute -->
+    <div id="r-warehouse-compute" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.15); color:var(--accent);">SQL</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Push Compute to Warehouse</div>
+          <div class="result-tagline" style="color:var(--text2)">BigQuery / Snowflake for SQL-expressible batch analytics</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">SQL-native</span>
+        <span class="tag tag-y">seconds-scale</span>
+        <span class="tag tag-b">serverless</span>
+        <span class="tag tag-t">auto-parallel</span>
+      </div>
+      <div class="section-block">
+        <h4>Why warehouse compute</h4>
+        <p>If your batch computation is expressible in SQL (GROUP BY, JOIN, window functions, HAVING, CTEs), don't use Spark. Modern warehouses are optimized for exactly this: columnar storage, automatic parallelism, query optimization, and zero cluster management. BigQuery can scan 10TB and return results in under 90 seconds. Snowflake separates compute from storage so you pay for active time only.</p>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">BigQuery 10TB scan + aggregation</span><span class="metric-v good">~30-90 seconds</span></div>
+        <div class="metric-row"><span class="metric-k">BigQuery cost (on-demand)</span><span class="metric-v warn">~$50 for 10TB</span></div>
+        <div class="metric-row"><span class="metric-k">Snowflake 4XL same workload</span><span class="metric-v warn">~2-5 min, ~$100-200</span></div>
+        <div class="metric-row"><span class="metric-k">Redshift (dc2.8xlarge x4)</span><span class="metric-v warn">~5-10 min for 10TB</span></div>
+        <div class="metric-row"><span class="metric-k">BigQuery slot-based pricing</span><span class="metric-v good">$2k/month for 100 slots</span></div>
+      </div>
+      <div class="compare-grid">
+        <div class="compare-cell">
+          <h5 style="color:var(--accent)">BigQuery</h5>
+          <p>Serverless, pay per scan. Fastest for ad-hoc queries. Best for GCP. Slot-based pricing for predictable workloads. ML built-in (BigQuery ML).</p>
+        </div>
+        <div class="compare-cell">
+          <h5 style="color:var(--accent5)">Snowflake</h5>
+          <p>Multi-cloud. Better concurrency handling. Data sharing across orgs. More granular compute sizing. Better for multi-team environments.</p>
+        </div>
+      </div>
+      <div class="callout good">If your batch job is expressible in SQL, don't use Spark. Warehouses are optimized for exactly this and require zero cluster management. The operational simplicity alone justifies the cost premium.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: computation → SQL aggregations</span>
+      </div>
+    </div>
+
+    <!-- Spark Graph -->
+    <div id="r-spark-graph" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(255,107,53,.15); color:var(--accent3);">GRX</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--amber)">Specialized</div>
+          <div class="result-db">Spark GraphX / Pregel-style Processing</div>
+          <div class="result-tagline" style="color:var(--text2)">Iterative graph algorithms at billion-edge scale</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-a">iterative</span>
+        <span class="tag tag-p">BSP model</span>
+        <span class="tag tag-b">billion-edge</span>
+        <span class="tag tag-t">PageRank / CC</span>
+      </div>
+      <div class="section-block">
+        <h4>Why graph processing</h4>
+        <p>PageRank, connected components, shortest paths, community detection — these algorithms iterate over the full graph multiple times until convergence. Each vertex sends messages to neighbors, processes received messages, and updates its state. This is the Bulk Synchronous Parallel (BSP) model. SQL can't express this efficiently because each iteration depends on the previous one.</p>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">PageRank on 1B edges (20 iterations)</span><span class="metric-v warn">~30-60 min on 50 nodes</span></div>
+        <div class="metric-row"><span class="metric-k">Connected components on 1B edges</span><span class="metric-v warn">~20-40 min on 50 nodes</span></div>
+        <div class="metric-row"><span class="metric-k">Memory per node</span><span class="metric-v warn">high — graph must fit in aggregate cluster memory</span></div>
+        <div class="metric-row"><span class="metric-k">Communication overhead</span><span class="metric-v bad">high — every iteration shuffles messages</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Alternatives</h4>
+        <p><strong>Neo4j:</strong> Better for smaller graphs (&lt;100M edges) with complex traversals and Cypher queries. Not distributed by default. <strong>Apache Giraph:</strong> Purpose-built for massive graph processing (Facebook scale). Better memory efficiency than GraphX but harder to operate. <strong>GraphFrames (Spark):</strong> DataFrame-based graph API, more ergonomic than GraphX, integrates with Spark SQL.</p>
+      </div>
+      <div class="callout info">Most "graph problems" at interview scale don't actually need a graph engine. If you're computing 2-hop connections or simple aggregations over a graph structure, a SQL self-join in BigQuery is simpler and faster. Reserve GraphX/Pregel for truly iterative algorithms that need convergence.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: computation → graph / iterative</span>
+      </div>
+    </div>
+
+    <!-- Spark Custom -->
+    <div id="r-spark-custom" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(255,107,53,.15); color:var(--accent3);">UDF</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Spark Custom Per-Record Processing</div>
+          <div class="result-tagline" style="color:var(--text2)">Arbitrary transforms in Python/Scala distributed across a cluster</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-a">UDFs / mapPartitions</span>
+        <span class="tag tag-b">distributed</span>
+        <span class="tag tag-t">Python / Scala</span>
+        <span class="tag tag-p">Arrow-optimized</span>
+      </div>
+      <div class="section-block">
+        <h4>When you need custom code</h4>
+        <p>Image processing, NLP preprocessing, complex business logic, calling external APIs per record — anything that doesn't fit SQL. Spark distributes your custom code across the cluster, handling partitioning, fault tolerance, and scheduling. Use mapPartitions for heavy initialization (loading models, opening connections) — it runs once per partition instead of once per row.</p>
+      </div>
+      <div class="section-block">
+        <h4>Performance pitfall: Python UDF serialization</h4>
+        <p>PySpark row-level UDFs serialize each row from JVM to Python and back. This serialization overhead can be 10-100x slower than native Spark SQL operations. The fix is Apache Arrow-based UDFs: pandas_udf or mapInArrow process entire batches in vectorized numpy/pandas operations. This eliminates per-row serialization and enables SIMD optimizations.</p>
+        <div class="code-block"><span class="cm"># SLOW: row-level UDF (serializes each row)</span>
+@udf(<span class="str">"string"</span>)
+<span class="kw">def</span> clean_text(text):
+    <span class="kw">return</span> text.lower().strip()
+
+<span class="cm"># FAST: Arrow-based batch UDF (10-100x faster)</span>
+@pandas_udf(<span class="str">"string"</span>)
+<span class="kw">def</span> clean_text_batch(texts: pd.Series) -&gt; pd.Series:
+    <span class="kw">return</span> texts.str.lower().str.strip()</div>
+      </div>
+      <div class="callout danger">Python UDF serialization is the #1 PySpark performance trap. A simple string transformation that takes 2 minutes in Spark SQL can take 2 hours with a row-level Python UDF. Always use pandas_udf or mapInArrow for batch processing.</div>
+      <div class="callout info">For external API calls (geocoding, enrichment), use mapPartitions with connection pooling and rate limiting. Process in batches, not per-row. Implement exponential backoff and circuit breakers to avoid overwhelming external services.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: computation → custom per-record</span>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════ -->
+    <!-- ORCHESTRATION RESULTS              -->
+    <!-- ═══════════════════════════════════ -->
+
+    <!-- Simple Orchestration -->
+    <div id="r-simple-orchestration" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.15); color:var(--accent5);">CRN</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Cron + Scripts / Prefect</div>
+          <div class="result-tagline" style="color:var(--text2)">Lightweight orchestration for simple linear pipelines</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">simple</span>
+        <span class="tag tag-b">Python-native</span>
+        <span class="tag tag-t">low overhead</span>
+        <span class="tag tag-a">&lt; 20 tasks</span>
+      </div>
+      <div class="section-block">
+        <h4>When simple is enough</h4>
+        <p>Cron is fine for fewer than 5 jobs with no dependencies between them. A cron job that runs a Python script every hour is the simplest possible orchestration. For slightly more complexity (retries, logging, notifications), Prefect is Python-native with decorator-based task definitions — no YAML, no separate scheduler service for basic use.</p>
+      </div>
+      <div class="section-block">
+        <h4>Comparison</h4>
+        <div class="metric-row"><span class="metric-k">Cron: setup complexity</span><span class="metric-v good">1 line in crontab</span></div>
+        <div class="metric-row"><span class="metric-k">Cron: retry support</span><span class="metric-v bad">none</span></div>
+        <div class="metric-row"><span class="metric-k">Cron: alerting</span><span class="metric-v bad">none (silent failures)</span></div>
+        <div class="metric-row"><span class="metric-k">Cron: dependency mgmt</span><span class="metric-v bad">none</span></div>
+        <div class="metric-row"><span class="metric-k">Prefect: Python decorators</span><span class="metric-v good">@flow, @task — familiar</span></div>
+        <div class="metric-row"><span class="metric-k">Prefect: retries + alerts</span><span class="metric-v good">built-in, configurable</span></div>
+        <div class="metric-row"><span class="metric-k">Prefect: UI</span><span class="metric-v good">free cloud dashboard</span></div>
+      </div>
+      <div class="callout danger">Cron's biggest risk: silent failures. A cron job that fails at 3am produces no alert, no retry, no audit trail. You discover the failure when a downstream consumer complains hours later. If you use cron, at minimum add: exit code checking, email on failure (MAILTO), and a monitoring check for expected output freshness.</div>
+      <div class="callout info">Prefect 2.x is a good stepping stone between cron and Airflow. It's Python-native (no separate DAG files), has a free cloud UI, and supports retries, caching, and notifications. When your pipeline outgrows Prefect, the mental model maps cleanly to Airflow/Dagster.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: orchestration → simple pipeline</span>
+      </div>
+    </div>
+
+    <!-- Airflow / Dagster -->
+    <div id="r-airflow" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.15); color:var(--accent);">DAG</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">Apache Airflow / Dagster</div>
+          <div class="result-tagline" style="color:var(--text2)">Production-grade DAG orchestration for complex data pipelines</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">DAG-based</span>
+        <span class="tag tag-b">retries / SLAs</span>
+        <span class="tag tag-a">100k+ tasks/day</span>
+        <span class="tag tag-t">Python</span>
+        <span class="tag tag-p">backfill</span>
+      </div>
+      <div class="section-block">
+        <h4>Why a full orchestrator</h4>
+        <p>When you have dozens of interdependent batch jobs across multiple teams, you need: dependency management (job B waits for job A), retry policies (exponential backoff, max retries), SLA monitoring (alert if job hasn't finished by 6am), backfill (reprocess last 30 days after a bug fix), audit logging (who ran what, when, with what result). Airflow and Dagster are the two leading options.</p>
+      </div>
+      <div class="compare-grid">
+        <div class="compare-cell">
+          <h5 style="color:var(--accent)">Apache Airflow</h5>
+          <p>Mature (2015+). Huge community. 1000+ operators/providers. Can be painful to test locally. Task-centric model. Managed options: MWAA (AWS), Cloud Composer (GCP).</p>
+        </div>
+        <div class="compare-cell">
+          <h5 style="color:var(--accent2)">Dagster</h5>
+          <p>Asset-centric (2019+). Better testing story. Software-defined assets model data lineage. Type checking. Better local development. Dagster Cloud for managed hosting.</p>
+        </div>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">Airflow + CeleryExecutor capacity</span><span class="metric-v good">1000s of DAGs, 100k+ tasks/day</span></div>
+        <div class="metric-row"><span class="metric-k">Airflow + KubernetesExecutor</span><span class="metric-v good">each task = isolated pod, auto-scales</span></div>
+        <div class="metric-row"><span class="metric-k">Scheduler throughput (Airflow 2.x)</span><span class="metric-v info">multiple schedulers supported</span></div>
+        <div class="metric-row"><span class="metric-k">MWAA pricing (medium)</span><span class="metric-v warn">~$0.49/hr (~$350/month)</span></div>
+        <div class="metric-row"><span class="metric-k">Dagster Cloud (standard)</span><span class="metric-v warn">~$100/month base</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Failure modes — what breaks in production</h4>
+        <p><strong>Scheduler bottleneck:</strong> A single scheduler processes all DAG files. With &gt;500 DAGs on 1-minute schedules, the scheduler falls behind — DAGs start late, tasks queue up. Fix: multiple schedulers (Airflow 2.x), increase min_file_process_interval, reduce DAG complexity (use TaskGroups instead of sprawling DAGs).</p>
+        <p style="margin-top:8px"><strong>Worker OOM:</strong> A task runs on a Celery worker with insufficient memory. The worker dies, taking all its running tasks with it. Fix: use KubernetesPodOperator for memory-heavy tasks (each task gets isolated resources), set task-level resource requirements, monitor worker memory.</p>
+        <p style="margin-top:8px"><strong>Zombie tasks:</strong> A task is marked "running" in the metadata DB, but the worker that was executing it has died. The task appears stuck. Fix: tune scheduler_zombie_task_threshold (default 300s), ensure heartbeat monitoring is working, implement health checks on workers.</p>
+        <p style="margin-top:8px"><strong>Cross-DAG dependencies:</strong> DAG A produces data that DAG B consumes. Airflow has no native cross-DAG dependency model. ExternalTaskSensor polls for completion but creates tight coupling and can waste worker slots. Fix: use Dagster's asset-centric model (assets declare dependencies explicitly), or use a shared data catalog with freshness checks instead of sensor-based polling.</p>
+      </div>
+      <div class="callout warn">Airflow is an ORCHESTRATOR, not an EXECUTOR. Don't run heavy processing inside Airflow tasks — use Airflow to trigger Spark jobs (SparkSubmitOperator), dbt runs (DbtRunOperator), or Kubernetes pods (KubernetesPodOperator). Airflow workers should be lightweight coordinators.</div>
+      <div class="callout info">If starting fresh in 2024+, strongly consider Dagster over Airflow. The asset-centric model (declaring "what data exists" rather than "what tasks run") maps better to how data teams actually think. It also solves the cross-DAG dependency problem natively. The main reason to choose Airflow is if your team already knows it or you need the massive ecosystem of community operators.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: orchestration → complex DAG</span>
+      </div>
+    </div>
+
+    <!-- ML Orchestration -->
+    <div id="r-ml-orchestration" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(0,255,200,.15); color:var(--accent2);">MLP</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended</div>
+          <div class="result-db">ML Pipeline Orchestration (Kubeflow / SageMaker / MLflow)</div>
+          <div class="result-tagline" style="color:var(--text2)">End-to-end ML lifecycle: train, evaluate, register, deploy</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">experiment tracking</span>
+        <span class="tag tag-b">model registry</span>
+        <span class="tag tag-t">automated retraining</span>
+        <span class="tag tag-p">A/B deployment</span>
+      </div>
+      <div class="section-block">
+        <h4>Why ML-specific orchestration</h4>
+        <p>ML pipelines have unique requirements beyond general DAG orchestration: experiment tracking (compare hyperparameters across runs), model versioning (which model is in production?), automated evaluation (compare new model vs current champion on holdout set), model registry (artifact storage with metadata), and deployment automation (canary rollout, A/B testing, rollback). General orchestrators like Airflow can do this, but ML platforms bake these concepts in.</p>
+      </div>
+      <div class="compare-grid">
+        <div class="compare-cell">
+          <h5 style="color:var(--accent5)">Kubeflow Pipelines</h5>
+          <p>Kubernetes-native. Flexible. Complex to set up. Full control over infrastructure. Best for teams already on K8s with strong platform engineering.</p>
+        </div>
+        <div class="compare-cell">
+          <h5 style="color:var(--accent3)">SageMaker Pipelines</h5>
+          <p>AWS-managed. Opinionated but simple. Built-in training, tuning, deployment. Best for AWS-heavy teams who want managed everything.</p>
+        </div>
+      </div>
+      <div class="compare-grid">
+        <div class="compare-cell">
+          <h5 style="color:var(--accent2)">MLflow</h5>
+          <p>Lightweight. Focus on experiment tracking + model registry. Works with any compute. Not a full orchestrator — pair with Airflow/Dagster for scheduling.</p>
+        </div>
+        <div class="compare-cell">
+          <h5 style="color:var(--accent4)">Ray + Anyscale</h5>
+          <p>Distributed Python. Excellent for distributed training + inference. Ray Train, Ray Serve. Best for teams doing custom distributed ML at scale.</p>
+        </div>
+      </div>
+      <div class="section-block">
+        <h4>Scale numbers</h4>
+        <div class="metric-row"><span class="metric-k">SageMaker training (8x A100)</span><span class="metric-v bad">~$24/hr</span></div>
+        <div class="metric-row"><span class="metric-k">Training 7B model from scratch</span><span class="metric-v bad">~48-72 hrs = $1,150-1,730</span></div>
+        <div class="metric-row"><span class="metric-k">Fine-tuning 7B (LoRA)</span><span class="metric-v warn">~2-8 hrs = $48-192</span></div>
+        <div class="metric-row"><span class="metric-k">MLflow experiment tracking</span><span class="metric-v good">lightweight, open-source</span></div>
+        <div class="metric-row"><span class="metric-k">Kubeflow setup time</span><span class="metric-v bad">days-weeks for production</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Key design pattern: Champion/Challenger</h4>
+        <div class="code-block"><span class="cm"># Automated retraining pipeline</span>
+<span class="kw">Schedule</span>: weekly (or on data drift detection)
+
+<span class="num">1.</span> <span class="kw">Data prep</span> → fresh training/eval split
+<span class="num">2.</span> <span class="kw">Train</span> challenger model → log to MLflow
+<span class="num">3.</span> <span class="kw">Evaluate</span> on holdout set
+     <span class="cm">├─ if challenger &gt; champion by threshold → promote</span>
+     <span class="cm">└─ if not → log results, keep champion</span>
+<span class="num">4.</span> <span class="kw">Register</span> new model version in registry
+<span class="num">5.</span> <span class="kw">Deploy</span> canary (5% traffic)
+<span class="num">6.</span> <span class="kw">Monitor</span> online metrics for 24h
+     <span class="cm">├─ if degradation → auto-rollback</span>
+     <span class="cm">└─ if stable → promote to 100%</span></div>
+      </div>
+      <div class="callout warn">The biggest risk in ML pipelines isn't model accuracy — it's silent degradation. A model deployed 6 months ago may have drifted as user behavior changed. Build automated monitoring for prediction distribution shifts, feature drift, and online metric degradation. Trigger retraining automatically, don't wait for someone to notice.</div>
+      <div class="nav-actions">
+        <button class="btn" onclick="goBack()">Back</button>
+        <button class="btn btn-primary" onclick="restart()">Start over</button>
+      </div>
+      <div class="result-footer">
+        <span>path: orchestration → ML pipeline</span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="right-panel">
+    <div class="rp-section">
+      <div class="rp-label">Technologies</div>
+      <div class="db-card" id="dbc-spark">
+        <div class="db-card-name">Apache Spark</div>
+        <div class="db-card-meta">Distributed compute engine. Batch + streaming. Catalyst optimizer.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">500k-1M rec/s/node</span>
+          <span class="db-stat">Python/Scala/Java</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-flink">
+        <div class="db-card-name">Apache Flink</div>
+        <div class="db-card-meta">Stream-first, batch capable. Exactly-once. Stateful processing.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">300k-800k rec/s</span>
+          <span class="db-stat">unified batch+stream</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-dbt">
+        <div class="db-card-name">dbt</div>
+        <div class="db-card-meta">SQL transforms in warehouse. Git-native. Incremental models.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">SQL + Jinja</span>
+          <span class="db-stat">warehouse-native</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-airflow">
+        <div class="db-card-name">Apache Airflow</div>
+        <div class="db-card-meta">DAG orchestrator. Python. Massive ecosystem of operators.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">100k+ tasks/day</span>
+          <span class="db-stat">1000+ providers</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-dagster">
+        <div class="db-card-name">Dagster</div>
+        <div class="db-card-meta">Asset-centric orchestration. Software-defined. Testable.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">asset-centric</span>
+          <span class="db-stat">type-safe</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-vllm">
+        <div class="db-card-name">vLLM</div>
+        <div class="db-card-meta">LLM serving. PagedAttention. Continuous batching.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">2-4x over static</span>
+          <span class="db-stat">KV cache mgmt</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-bigquery">
+        <div class="db-card-name">BigQuery</div>
+        <div class="db-card-meta">Serverless warehouse. Columnar. Auto-scaling.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">$5/TB scanned</span>
+          <span class="db-stat">seconds-scale</span>
+        </div>
+      </div>
+      <div class="db-card" id="dbc-ray">
+        <div class="db-card-name">Ray</div>
+        <div class="db-card-meta">Distributed Python. ML-focused. Auto-scaling GPU clusters.</div>
+        <div class="db-card-stats">
+          <span class="db-stat">Ray Train/Serve</span>
+          <span class="db-stat">GPU-native</span>
+        </div>
+      </div>
+    </div>
+    <div class="rp-section">
+      <div class="rp-label">Golden rules</div>
+      <div class="rule-item"><span class="rule-num">01</span><span>Batch size isn't free — larger batches mean longer recovery time on failure. Checkpoint frequently.</span></div>
+      <div class="rule-item"><span class="rule-num">02</span><span>Idempotency is non-negotiable. Every batch job must produce the same output if run twice on the same input.</span></div>
+      <div class="rule-item"><span class="rule-num">03</span><span>Partition by time first, then by key. Time partitions enable efficient backfill and incremental processing.</span></div>
+      <div class="rule-item"><span class="rule-num">04</span><span>Monitor wall-clock time, not just throughput. A job processing 1M rec/s that takes 4 hours has a problem.</span></div>
+      <div class="rule-item"><span class="rule-num">05</span><span>Test with production-scale data, not 1% samples. Skew and OOM only appear at scale.</span></div>
+      <div class="rule-item"><span class="rule-num">06</span><span>Separate compute from storage. S3/GCS + Spark/warehouse is almost always better than HDFS.</span></div>
+      <div class="rule-item"><span class="rule-num">07</span><span>Plan for backfill from day one. You WILL need to reprocess historical data. Design for it.</span></div>
+      <div class="rule-item"><span class="rule-num">08</span><span>For GPU batch: measure tokens/second/dollar, not just tokens/second. Spot instances change the math.</span></div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+const history = [];
+const stateLabels = {
+  'q0':'Start',
+  'q1-etl':'ETL / Pipeline','q1-inference':'ML/AI Inference','q1-compute':'Computation','q1-orchestration':'Orchestration',
+  'q2-etl-scale':'Data volume','q2-llm-inference':'LLM latency',
+  'r-dbt':'dbt','r-spark-etl':'Spark ETL','r-simple-etl':'Lightweight ETL','r-warehouse-etl':'Warehouse ETL',
+  'r-cdc-batch':'CDC Sync','r-offline-llm':'Offline LLM','r-nearrt-llm':'Near-RT LLM',
+  'r-spark-ml':'Spark ML','r-embedding-batch':'Embeddings',
+  'r-warehouse-compute':'Warehouse Compute','r-spark-graph':'GraphX','r-spark-custom':'Custom Spark',
+  'r-simple-orchestration':'Cron/Prefect','r-airflow':'Airflow/Dagster','r-ml-orchestration':'ML Pipeline'
+};
+const resultHighlights = {
+  'r-dbt':'dbc-dbt','r-spark-etl':'dbc-spark','r-simple-etl':null,'r-warehouse-etl':'dbc-bigquery',
+  'r-cdc-batch':null,'r-offline-llm':'dbc-vllm','r-nearrt-llm':'dbc-vllm',
+  'r-spark-ml':'dbc-spark','r-embedding-batch':'dbc-vllm',
+  'r-warehouse-compute':'dbc-bigquery','r-spark-graph':'dbc-spark','r-spark-custom':'dbc-spark',
+  'r-simple-orchestration':null,'r-airflow':'dbc-airflow','r-ml-orchestration':'dbc-ray'
+};
+const totalDepth = 4;
+
+function go(nextId, label) {
+  const cur = document.querySelector('.state.on');
+  history.push({ id: cur.id, label });
+  cur.classList.remove('on');
+  document.getElementById(nextId).classList.add('on');
+  updateUI(nextId);
+}
+
+function goBack() {
+  if (!history.length) return;
+  const prev = history.pop();
+  document.querySelector('.state.on').classList.remove('on');
+  document.getElementById(prev.id).classList.add('on');
+  updateUI(prev.id);
+}
+
+function restart() {
+  history.length = 0;
+  document.querySelector('.state.on').classList.remove('on');
+  document.getElementById('q0').classList.add('on');
+  updateUI('q0');
+}
+
+function updateUI(currentId) {
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = history.map((h, i) =>
+    `<span class="bc-item">${h.label}</span>${i < history.length - 1 ? '<span class="bc-sep">\u203a</span>' : ''}`
+  ).join('');
+
+  const fill = document.getElementById('progress-fill');
+  const label = document.getElementById('step-label');
+  const depth = history.length;
+  const pct = Math.min(100, (depth / totalDepth) * 100);
+  fill.style.width = pct + '%';
+  label.textContent = `step ${depth}`;
+
+  document.querySelectorAll('.db-card').forEach(c => c.classList.remove('highlight'));
+  const hlId = resultHighlights[currentId];
+  if (hlId) {
+    const el = document.getElementById(hlId);
+    if (el) el.classList.add('highlight');
+  }
+
+  const treeNav = document.getElementById('tree-nav');
+  const navItems = [...history.map(h => h.id), currentId];
+  treeNav.innerHTML = navItems.map((id, i) => {
+    const isCurrent = i === navItems.length - 1;
+    const lbl = stateLabels[id] || id;
+    return `<div class="tree-item ${isCurrent ? 'current' : 'visited'}">
+      <div class="tree-dot"></div>${lbl}</div>`;
+  }).join('');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Backspace' || e.key === 'ArrowLeft') { goBack(); return; }
+  const n = parseInt(e.key);
+  if (n >= 1 && n <= 4) {
+    const cur = document.querySelector('.state.on');
+    const opts = cur.querySelectorAll('.opt');
+    if (opts[n - 1]) opts[n - 1].click();
+  }
+});
+
+updateUI('q0');
+</script>
+</body>
+</html>
