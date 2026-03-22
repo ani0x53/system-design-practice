@@ -1,0 +1,2007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Structures — System Design Decision Tree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #111111;
+    --bg3: #181818;
+    --bg4: #1f1f1f;
+    --border: #2a2a2a;
+    --border2: #333;
+    --text: #e8e8e8;
+    --text2: #999;
+    --text3: #666;
+    --accent: #e8ff00;
+    --accent2: #00ffc8;
+    --accent3: #ff6b35;
+    --accent4: #a78bfa;
+    --accent5: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 24px 32px 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .header-left {}
+  .site-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .site-label a {
+    color: var(--text3);
+    text-decoration: none;
+    transition: color .15s;
+  }
+  .site-label a:hover { color: var(--text2); }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -.02em;
+    line-height: 1.2;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .header-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .meta-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    border: 1px solid var(--border2);
+    padding: 3px 8px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .meta-chip .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .progress-track {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .progress-bar {
+    width: 120px;
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width .4s ease;
+    width: 0%;
+  }
+
+  .breadcrumb {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    max-width: 380px;
+    justify-content: flex-end;
+  }
+
+  .bc-item { color: var(--text2); }
+  .bc-sep { color: var(--text3); opacity: .5; }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 280px;
+    min-height: calc(100vh - 89px);
+  }
+
+  /* ── LEFT SIDEBAR ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 89px);
+  }
+
+  .sidebar-section {
+    padding: 0 20px;
+    margin-bottom: 24px;
+  }
+
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .tree-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12px;
+    color: var(--text3);
+    cursor: pointer;
+    transition: color .15s;
+    font-family: var(--mono);
+  }
+
+  .tree-item:hover { color: var(--text2); }
+  .tree-item.visited { color: var(--text2); }
+  .tree-item.current { color: var(--accent); }
+
+  .tree-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--border2);
+    flex-shrink: 0;
+    transition: all .15s;
+  }
+
+  .tree-item.visited .tree-dot { background: var(--text3); border-color: var(--text3); }
+  .tree-item.current .tree-dot { background: var(--accent); border-color: var(--accent); }
+
+  .numbers-ref {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 0 20px 20px;
+  }
+
+  .num-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .num-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+
+  .num-row:last-child { border-bottom: none; }
+
+  .num-k {
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  .num-v {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .num-v.green { color: var(--green); }
+  .num-v.amber { color: var(--amber); }
+  .num-v.red { color: var(--red); }
+
+  /* ── MAIN ── */
+  .main {
+    padding: 32px 36px;
+    max-width: 780px;
+  }
+
+  /* STATE */
+  .state { display: none; }
+  .state.on { display: block; animation: fadeIn .2s ease; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* QUESTION */
+  .q-step {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .q-title {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+
+  .q-subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-bottom: 28px;
+    max-width: 560px;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .opt {
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all .15s;
+    background: var(--bg2);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .opt::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: background .15s;
+  }
+
+  .opt:hover {
+    border-color: var(--border2);
+    background: var(--bg3);
+  }
+
+  .opt:hover::before { background: var(--accent); }
+
+  .opt-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    border: 1px solid var(--border2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    min-width: 24px;
+    text-align: center;
+    transition: all .15s;
+  }
+
+  .opt:hover .opt-key {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .opt-body {}
+
+  .opt-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .opt-sub {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .opt-numbers {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 5px;
+  }
+
+  /* RESULT */
+  .result-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .result-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .result-title-wrap {}
+
+  .result-verdict {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .result-db {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .result-tagline {
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: .02em;
+  }
+
+  .tag-g { background: rgba(74,222,128,.12); color: var(--green); border: 1px solid rgba(74,222,128,.25); }
+  .tag-r { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.25); }
+  .tag-a { background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.25); }
+  .tag-b { background: rgba(56,189,248,.12); color: var(--accent5); border: 1px solid rgba(56,189,248,.25); }
+  .tag-p { background: rgba(167,139,250,.12); color: var(--accent4); border: 1px solid rgba(167,139,250,.25); }
+  .tag-y { background: rgba(232,255,0,.12); color: var(--accent); border: 1px solid rgba(232,255,0,.25); }
+  .tag-t { background: rgba(0,255,200,.12); color: var(--accent2); border: 1px solid rgba(0,255,200,.25); }
+
+  .section-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+
+  .section-block h4 {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .section-block p {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.65;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    gap: 12px;
+  }
+
+  .metric-row:last-child { border-bottom: none; }
+
+  .metric-k {
+    color: var(--text2);
+    flex: 1;
+  }
+
+  .metric-v {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  .metric-v.good { color: var(--green); }
+  .metric-v.warn { color: var(--amber); }
+  .metric-v.bad { color: var(--red); }
+  .metric-v.info { color: var(--accent5); }
+  .metric-v.acc { color: var(--accent); }
+
+  .callout {
+    border-left: 2px solid;
+    padding: 10px 12px;
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .callout.warn {
+    border-color: var(--amber);
+    background: rgba(251,191,36,.06);
+    color: var(--amber);
+  }
+
+  .callout.good {
+    border-color: var(--green);
+    background: rgba(74,222,128,.06);
+    color: #86efac;
+  }
+
+  .callout.info {
+    border-color: var(--accent5);
+    background: rgba(56,189,248,.06);
+    color: #7dd3fc;
+  }
+
+  .callout.danger {
+    border-color: var(--red);
+    background: rgba(248,113,113,.06);
+    color: #fca5a5;
+  }
+
+  .code-block {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 12px 14px;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-top: 8px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .code-block .kw { color: var(--accent4); }
+  .code-block .str { color: var(--accent2); }
+  .code-block .num { color: var(--accent); }
+  .code-block .cm { color: var(--text3); }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .compare-cell {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    background: var(--bg2);
+  }
+
+  .compare-cell h5 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .compare-cell p {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  /* BACK / RESET */
+  .nav-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: .02em;
+  }
+
+  .btn:hover {
+    border-color: var(--text3);
+    color: var(--text2);
+  }
+
+  .btn-primary {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-primary:hover {
+    background: var(--accent);
+    color: #000;
+  }
+
+  /* ── RIGHT PANEL ── */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    padding: 24px 20px;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 89px);
+  }
+
+  .rp-section {
+    margin-bottom: 24px;
+  }
+
+  .rp-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .db-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: var(--bg2);
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .db-card:hover { border-color: var(--border2); background: var(--bg3); }
+  .db-card.highlight { border-color: var(--accent); }
+
+  .db-card-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .db-card.highlight .db-card-name { color: var(--accent); }
+
+  .db-card-meta {
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.4;
+  }
+
+  .db-card-stats {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .db-stat {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    background: var(--bg3);
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+  }
+
+  .rule-item {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+    display: flex;
+    gap: 8px;
+  }
+
+  .rule-item:last-child { border-bottom: none; }
+
+  .rule-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── INTRO ── */
+  .intro-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .intro-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    background: var(--bg2);
+  }
+
+  .intro-card-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .intro-card p {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .big-number {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  /* ── VISUAL DIAGRAMS ── */
+  .ds-visual {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 14px 16px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-top: 8px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar, .right-panel { display: none; }
+    .main { max-width: 100%; padding: 24px 20px; }
+  }
+
+  /* Keyboard hint */
+  .kbd-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .kbd {
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 9px;
+    color: var(--text3);
+  }
+
+  /* Footer */
+  .result-footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="site-label"><a href="index.html">System Design Practice</a></div>
+    <h1>Data Structures &amp; Algorithms — <span>Decision Tree</span></h1>
+    <div class="header-meta">
+      <div class="meta-chip"><div class="dot" style="background:var(--green)"></div> Sequential</div>
+      <div class="meta-chip"><div class="dot" style="background:var(--amber)"></div> Ordered / search</div>
+      <div class="meta-chip"><div class="dot" style="background:var(--accent4)"></div> Priority</div>
+      <div class="meta-chip"><div class="dot" style="background:var(--accent5)"></div> Graphs</div>
+      <div class="meta-chip">12 decision paths</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="progress-track">
+      <span id="step-label">step 0</span>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Big-O at scale</div>
+      <div class="numbers-ref">
+        <div class="num-title">n = 1,000 elements</div>
+        <div class="num-row"><span class="num-k">O(1)</span><span class="num-v green">1 op</span></div>
+        <div class="num-row"><span class="num-k">O(log n)</span><span class="num-v green">~10 ops</span></div>
+        <div class="num-row"><span class="num-k">O(n)</span><span class="num-v amber">1,000 ops</span></div>
+        <div class="num-row"><span class="num-k">O(n log n)</span><span class="num-v amber">~10,000 ops</span></div>
+        <div class="num-row"><span class="num-k">O(n²)</span><span class="num-v red">1,000,000 ops</span></div>
+      </div>
+      <div class="numbers-ref">
+        <div class="num-title">n = 1,000,000 elements</div>
+        <div class="num-row"><span class="num-k">O(1)</span><span class="num-v green">1 op</span></div>
+        <div class="num-row"><span class="num-k">O(log n)</span><span class="num-v green">~20 ops</span></div>
+        <div class="num-row"><span class="num-k">O(n)</span><span class="num-v amber">1M ops</span></div>
+        <div class="num-row"><span class="num-k">O(n log n)</span><span class="num-v red">~20M ops</span></div>
+        <div class="num-row"><span class="num-k">O(n²)</span><span class="num-v red">1T ops — dead</span></div>
+      </div>
+      <div class="numbers-ref">
+        <div class="num-title">Rough CPU budget</div>
+        <div class="num-row"><span class="num-k">L1 cache hit</span><span class="num-v green">~1ns</span></div>
+        <div class="num-row"><span class="num-k">L3 cache hit</span><span class="num-v green">~10ns</span></div>
+        <div class="num-row"><span class="num-k">RAM access</span><span class="num-v amber">~100ns</span></div>
+        <div class="num-row"><span class="num-k">SSD read (4KB)</span><span class="num-v amber">~100µs</span></div>
+        <div class="num-row"><span class="num-k">HDD seek</span><span class="num-v red">~10ms</span></div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navigation</div>
+      <div id="tree-nav"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- ══ ROOT ══ -->
+    <div id="q0" class="state on">
+      <div class="q-step">Starting point</div>
+      <div class="q-title">What operation do you need to be fast?</div>
+      <div class="q-subtitle">Every data structure is an answer to a specific performance problem. Pick the bottleneck you're actually hitting — the right structure follows from that.</div>
+
+      <div class="intro-grid">
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--green)">Sequential access</div>
+          <p>Store items, access by position. Arrays, lists, stacks, queues — the building blocks of everything else.</p>
+        </div>
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--amber)">Ordered search</div>
+          <p>Find, insert, delete while maintaining sorted order. BSTs, balanced trees, B-trees — the engine behind databases.</p>
+        </div>
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--accent4)">Priority access</div>
+          <p>Always grab the min or max first. Heaps and priority queues — used in scheduling, shortest-path, and stream processing.</p>
+        </div>
+        <div class="intro-card">
+          <div class="intro-card-title" style="color:var(--accent5)">Graph traversal</div>
+          <p>Find paths between connected nodes. BFS, DFS, Dijkstra — the foundation of routing, social graphs, and dependency resolution.</p>
+        </div>
+      </div>
+
+      <div class="kbd-hint"><span class="kbd">1</span>–<span class="kbd">4</span> select · <span class="kbd">←</span> back</div>
+
+      <div class="options">
+        <div class="opt" onclick="go('q1-sequential','Sequential')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Store &amp; access items by position</div>
+            <div class="opt-sub">You need to store a collection and access elements by index, iterate in order, or add/remove at specific positions.</div>
+            <div class="opt-numbers">Arrays → ArrayLists → LinkedLists → Stacks → Queues</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-ordered','Ordered search')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Search, insert &amp; keep data sorted</div>
+            <div class="opt-sub">You need fast lookups, range queries, or ordered iteration — and the data changes over time.</div>
+            <div class="opt-numbers">BST → Red-Black Tree → B-Tree</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-priority','Priority')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Always access the highest/lowest priority item</div>
+            <div class="opt-sub">You repeatedly need the min or max element, or process items in priority order.</div>
+            <div class="opt-numbers">Binary Heap → Priority Queue → Dijkstra's inner loop</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q1-graph','Graph traversal')">
+          <span class="opt-key">4</span>
+          <div class="opt-body">
+            <div class="opt-title">Find paths between connected nodes</div>
+            <div class="opt-sub">You have entities with relationships and need to traverse, search, or find shortest paths.</div>
+            <div class="opt-numbers">BFS → DFS → Dijkstra</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SEQUENTIAL BRANCH ══ -->
+    <div id="q1-sequential" class="state">
+      <div class="q-step">Sequential → step 1 of 2</div>
+      <div class="q-title">What's your access pattern?</div>
+      <div class="q-subtitle">The core tradeoff: contiguous memory (fast reads, slow inserts) vs. linked nodes (fast inserts, slow reads). Pick based on what you do most.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-array','Fixed-size random access')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Index-based random access, size known upfront</div>
+            <div class="opt-sub">You know the size at creation time. Access by index is the hot path. No inserts in the middle.</div>
+            <div class="opt-numbers">arr[i] = O(1). Contiguous memory → CPU cache friendly.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-arraylist','Dynamic-size append')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Dynamic size, mostly append at the end</div>
+            <div class="opt-sub">Size isn't known upfront. You add/remove elements mainly at the tail. Still need fast index access.</div>
+            <div class="opt-numbers">Amortized O(1) append. Doubles capacity when full. Still cache-friendly.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-linkedlist','Frequent mid-insert/delete')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Frequent insert/delete at arbitrary positions</div>
+            <div class="opt-sub">You insert or remove in the middle often, and you already have a reference to the node. Iteration order matters more than index access.</div>
+            <div class="opt-numbers">Insert/delete at known position = O(1). But finding the position = O(n).</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('q2-restricted','Restricted: only access the ends')">
+          <span class="opt-key">4</span>
+          <div class="opt-body">
+            <div class="opt-title">Restricted access — only the top or front</div>
+            <div class="opt-sub">You don't need arbitrary access. Elements go in one end and come out from one (or both) ends, in a strict order.</div>
+            <div class="opt-numbers">Stack (LIFO) or Queue (FIFO) — O(1) push/pop on both.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="q2-restricted" class="state">
+      <div class="q-step">Sequential → restricted → step 2 of 2</div>
+      <div class="q-title">What order do elements come out?</div>
+      <div class="q-subtitle">LIFO and FIFO seem simple, but they're the backbone of function calls, undo systems, task scheduling, and graph traversal.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-stack','LIFO')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Last in, first out — LIFO</div>
+            <div class="opt-sub">Undo/redo, browser back button, function call stack, DFS, expression evaluation, matching parentheses.</div>
+            <div class="opt-numbers">Push and pop both O(1). Array-backed in practice (not linked list).</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-queue','FIFO')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">First in, first out — FIFO</div>
+            <div class="opt-sub">Task scheduling, BFS, print queue, message queues, rate limiters, sliding window.</div>
+            <div class="opt-numbers">Enqueue and dequeue both O(1). Circular array or linked list backed.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ORDERED/SEARCH BRANCH ══ -->
+    <div id="q1-ordered" class="state">
+      <div class="q-step">Ordered search → step 1 of 2</div>
+      <div class="q-title">How balanced must your search tree stay?</div>
+      <div class="q-subtitle">An unbalanced BST degrades to a linked list — O(n) search. The question is how much you're willing to pay for balance guarantees.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-bst','Simple, mostly random data')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Data is roughly random — simple BST is fine</div>
+            <div class="opt-sub">Insertions come in random order. Worst-case isn't a concern. You want the simplest implementation.</div>
+            <div class="opt-numbers">Average O(log n) search/insert. Worst case O(n) if sorted input.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-redblack','Must guarantee O(log n)')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Must guarantee O(log n) worst case, in-memory</div>
+            <div class="opt-sub">Adversarial or sorted input is possible. You need guaranteed logarithmic operations. TreeMap, TreeSet — all self-balancing BSTs.</div>
+            <div class="opt-numbers">Red-Black: max height 2·log₂(n). AVL: stricter — max height 1.44·log₂(n).</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-btree','Massive data, disk-backed')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Massive dataset — minimize disk I/O</div>
+            <div class="opt-sub">Data doesn't fit in RAM. You need to minimize disk reads. Each node should hold many keys to reduce tree height.</div>
+            <div class="opt-numbers">B-Tree with order 1000: 1 billion keys in ~3 levels = 3 disk reads.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PRIORITY BRANCH ══ -->
+    <div id="q1-priority" class="state">
+      <div class="q-step">Priority → step 1 of 2</div>
+      <div class="q-title">Do you need to update priorities of existing items?</div>
+      <div class="q-subtitle">A basic heap is great for extract-min/max. But some algorithms (Dijkstra, Prim's) need to decrease the priority of an item already in the heap — that changes which implementation you need.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-heap','Just extract min/max')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">No — just insert and extract-min/max</div>
+            <div class="opt-sub">Process events by timestamp, merge k sorted lists, find the k largest elements, median maintenance.</div>
+            <div class="opt-numbers">Insert: O(log n). Extract-min: O(log n). Peek: O(1). Array-backed, no pointers.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-pq','Need decrease-key')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Yes — need to decrease-key for existing entries</div>
+            <div class="opt-sub">Running Dijkstra's algorithm, Prim's MST, or any algorithm that discovers a shorter path to a node already in the queue.</div>
+            <div class="opt-numbers">Binary heap decrease-key: O(log n). Fibonacci heap: O(1) amortized.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ GRAPH BRANCH ══ -->
+    <div id="q1-graph" class="state">
+      <div class="q-step">Graph traversal → step 1 of 2</div>
+      <div class="q-title">What kind of path are you looking for?</div>
+      <div class="q-subtitle">BFS finds shortest paths in unweighted graphs. DFS explores exhaustively. Dijkstra handles weighted edges. The right algorithm depends on what "shortest" means in your graph.</div>
+      <div class="options">
+        <div class="opt" onclick="go('r-bfs','Shortest path, equal edges')">
+          <span class="opt-key">1</span>
+          <div class="opt-body">
+            <div class="opt-title">Shortest path — all edges have equal weight</div>
+            <div class="opt-sub">Social network "degrees of separation", word ladder, maze shortest path, web crawler level-by-level.</div>
+            <div class="opt-numbers">O(V + E) time. Uses a Queue. Guarantees shortest path in unweighted graphs.</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-dfs','Explore everything / detect cycles')">
+          <span class="opt-key">2</span>
+          <div class="opt-body">
+            <div class="opt-title">Explore all paths, detect cycles, topological sort</div>
+            <div class="opt-sub">Course prerequisite ordering, dependency resolution, cycle detection, maze generation, connected components.</div>
+            <div class="opt-numbers">O(V + E) time. Uses a Stack (or recursion). Memory-efficient: O(V) vs BFS O(V).</div>
+          </div>
+        </div>
+        <div class="opt" onclick="go('r-dijkstra','Shortest path, weighted edges')">
+          <span class="opt-key">3</span>
+          <div class="opt-body">
+            <div class="opt-title">Shortest path — edges have different weights</div>
+            <div class="opt-sub">GPS navigation, network routing (OSPF), cheapest flight, minimum latency path.</div>
+            <div class="opt-numbers">O((V + E) log V) with a min-heap. No negative edge weights.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ RESULTS ══════════════════ -->
+
+    <!-- Array -->
+    <div id="r-array" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(74,222,128,.1);color:var(--green)">[]</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended structure</div>
+          <div class="result-db" style="color:var(--green)">Array</div>
+          <div class="result-tagline" style="color:var(--text2)">Contiguous memory. O(1) index access. The simplest and fastest sequential structure.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(1) read by index</span>
+        <span class="tag tag-g">cache-friendly</span>
+        <span class="tag tag-g">zero overhead per element</span>
+        <span class="tag tag-r">fixed size at creation</span>
+        <span class="tag tag-r">O(n) insert in middle</span>
+      </div>
+      <div class="section-block">
+        <h4>Why it works</h4>
+        <p>Elements are stored in contiguous memory. The address of element i is just <code>base + i × element_size</code> — pure arithmetic, no pointer chasing. This also means the CPU prefetcher can predict your access pattern and preload cache lines. For sequential scans, arrays are unbeatable.</p>
+      </div>
+      <div class="section-block">
+        <h4>Time complexity</h4>
+        <div class="metric-row"><span class="metric-k">Access by index</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Search (unsorted)</span><span class="metric-v warn">O(n)</span></div>
+        <div class="metric-row"><span class="metric-k">Search (sorted)</span><span class="metric-v good">O(log n) — binary search</span></div>
+        <div class="metric-row"><span class="metric-k">Insert at end (if space)</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Insert at index i</span><span class="metric-v bad">O(n) — shift everything right</span></div>
+        <div class="metric-row"><span class="metric-k">Delete at index i</span><span class="metric-v bad">O(n) — shift everything left</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Memory layout</h4>
+        <div class="ds-visual"><span class="cm">// Contiguous block in memory</span>
+┌─────┬─────┬─────┬─────┬─────┐
+│  3  │  7  │  1  │  9  │  4  │
+└─────┴─────┴─────┴─────┴─────┘
+ [0]   [1]   [2]   [3]   [4]
+
+addr[i] = base + i × sizeof(element)
+<span class="cm">// One multiplication. No pointers. No indirection.</span></div>
+      </div>
+      <div class="callout info">In system design: arrays underpin everything. Hash table buckets, ring buffers, heap storage, adjacency matrices. When you hear "contiguous memory" in an interview, think array.</div>
+      <div class="callout warn">The fixed-size problem: if you guess too small, you can't grow. If you guess too big, you waste memory. This is exactly the problem that ArrayList/dynamic arrays solve.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- ArrayList -->
+    <div id="r-arraylist" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(74,222,128,.1);color:var(--green)">AL</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--green)">Recommended structure</div>
+          <div class="result-db" style="color:var(--green)">ArrayList (Dynamic Array)</div>
+          <div class="result-tagline" style="color:var(--text2)">Array that grows automatically. Amortized O(1) append. The default list in most languages.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(1) index access</span>
+        <span class="tag tag-g">amortized O(1) append</span>
+        <span class="tag tag-g">cache-friendly</span>
+        <span class="tag tag-a">occasional O(n) resize</span>
+        <span class="tag tag-r">O(n) insert in middle</span>
+      </div>
+      <div class="section-block">
+        <h4>Why it works</h4>
+        <p>Starts with a small array. When full, allocates a new array 2× the size and copies everything over. The copy is O(n), but it happens so rarely that averaged over all operations, each append is O(1). This is the "amortized" trick — you pay for one expensive resize across many cheap appends.</p>
+      </div>
+      <div class="section-block">
+        <h4>Time complexity</h4>
+        <div class="metric-row"><span class="metric-k">Access by index</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Append (amortized)</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Append (worst case — resize)</span><span class="metric-v warn">O(n)</span></div>
+        <div class="metric-row"><span class="metric-k">Insert at index i</span><span class="metric-v bad">O(n)</span></div>
+        <div class="metric-row"><span class="metric-k">Delete at index i</span><span class="metric-v bad">O(n)</span></div>
+        <div class="metric-row"><span class="metric-k">Search</span><span class="metric-v warn">O(n)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>The doubling trick</h4>
+        <div class="ds-visual"><span class="cm">// Geometric resizing: capacity doubles when full</span>
+<span class="cm">// n=4, capacity=4 → FULL! Allocate 8, copy over.</span>
+
+size=4  ┌───┬───┬───┬───┐
+        │ a │ b │ c │ d │  ← full
+        └───┴───┴───┴───┘
+
+size=5  ┌───┬───┬───┬───┬───┬───┬───┬───┐
+        │ a │ b │ c │ d │ e │   │   │   │
+        └───┴───┴───┴───┴───┴───┴───┴───┘
+                              ↑ new element
+                                  capacity=8
+
+<span class="cm">// Total copies after n appends: n + n/2 + n/4 + ... ≈ 2n</span>
+<span class="cm">// Amortized cost per append: 2n / n = O(1)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Language implementations</h4>
+        <div class="metric-row"><span class="metric-k">Java</span><span class="metric-v info">ArrayList&lt;E&gt; (grows 50%)</span></div>
+        <div class="metric-row"><span class="metric-k">Python</span><span class="metric-v info">list (grows ~12.5%)</span></div>
+        <div class="metric-row"><span class="metric-k">C++</span><span class="metric-v info">std::vector (grows 2×)</span></div>
+        <div class="metric-row"><span class="metric-k">Go</span><span class="metric-v info">slice (grows 2× then ~25%)</span></div>
+        <div class="metric-row"><span class="metric-k">JavaScript</span><span class="metric-v info">Array (engine-optimised)</span></div>
+      </div>
+      <div class="callout good">This is the default choice for any "list of things" in nearly every language. Unless you have a specific reason to use something else, use this. Java's ArrayList, Python's list, Go's slice, C++ std::vector are all dynamic arrays.</div>
+      <div class="callout warn">If you're inserting millions of items at arbitrary positions (not the end), this is the wrong structure. Each mid-insert shifts O(n) elements. Consider a linked list or a balanced BST for that pattern.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- LinkedList -->
+    <div id="r-linkedlist" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(167,139,250,.1);color:var(--accent4)">LL</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent4)">Recommended structure</div>
+          <div class="result-db" style="color:var(--accent4)">Linked List</div>
+          <div class="result-tagline" style="color:var(--text2)">O(1) insert/delete at a known position. No shifting. No resizing. But no random access.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(1) insert/delete at known node</span>
+        <span class="tag tag-g">no capacity limits</span>
+        <span class="tag tag-g">stable pointers (no invalidation)</span>
+        <span class="tag tag-r">O(n) access by index</span>
+        <span class="tag tag-r">poor cache locality</span>
+        <span class="tag tag-r">extra pointer overhead per node</span>
+      </div>
+      <div class="section-block">
+        <h4>Why it works (and when it doesn't)</h4>
+        <p>Each node stores data + a pointer to the next node (and previous, for doubly-linked). Insert/delete is just pointer rewiring — O(1) if you already have the node reference. The catch: to <em>find</em> a node by index, you must walk from the head — O(n). Nodes are scattered in memory, so the CPU cache can't help you. In practice, ArrayList beats LinkedList for almost everything due to cache effects, unless you have a workload dominated by mid-list insert/delete with direct node references (e.g., LRU cache).</p>
+      </div>
+      <div class="section-block">
+        <h4>Time complexity</h4>
+        <div class="metric-row"><span class="metric-k">Access by index</span><span class="metric-v bad">O(n)</span></div>
+        <div class="metric-row"><span class="metric-k">Insert/delete at head</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Insert/delete at known node</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Search</span><span class="metric-v bad">O(n)</span></div>
+        <div class="metric-row"><span class="metric-k">Memory overhead (doubly-linked)</span><span class="metric-v warn">+16 bytes/node (two pointers)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Singly vs Doubly linked</h4>
+        <div class="compare-grid">
+          <div class="compare-cell">
+            <h5 style="color:var(--accent4)">Singly linked</h5>
+            <p>One pointer per node (next). Can only traverse forward. Less memory. Deletion requires reference to the <em>previous</em> node. Good for stacks, simple iteration.</p>
+          </div>
+          <div class="compare-cell">
+            <h5 style="color:var(--accent4)">Doubly linked</h5>
+            <p>Two pointers per node (next + prev). Traverse both ways. O(1) deletion with just the node reference. Used in LRU caches, browser history, undo buffers.</p>
+          </div>
+        </div>
+      </div>
+      <div class="section-block">
+        <h4>Structure</h4>
+        <div class="ds-visual"><span class="cm">// Singly linked</span>
+┌───┬───┐   ┌───┬───┐   ┌───┬───┐   ┌───┬───┐
+│ 3 │ ──┼──→│ 7 │ ──┼──→│ 1 │ ──┼──→│ 9 │ ∅ │
+└───┴───┘   └───┴───┘   └───┴───┘   └───┴───┘
+head                                    tail
+
+<span class="cm">// Doubly linked</span>
+     ┌───┬───┬───┐   ┌───┬───┬───┐   ┌───┬───┬───┐
+∅ ←──┤ ← │ 3 │ → ├──→│ ← │ 7 │ → ├──→│ ← │ 1 │ → ├──→ ∅
+     └───┴───┴───┘   └───┴───┴───┘   └───┴───┴───┘
+
+<span class="cm">// Insert node X after node B: just rewire pointers</span>
+<span class="cm">// X.next = B.next; B.next.prev = X; B.next = X; X.prev = B;</span></div>
+      </div>
+      <div class="callout info">The killer use case: LRU cache = HashMap + Doubly-Linked List. The map gives O(1) lookup, the linked list gives O(1) eviction and move-to-front. This is literally how every in-memory cache works (Memcached, Redis internals, OS page cache).</div>
+      <div class="callout danger">Bjarne Stroustrup (C++ creator) ran benchmarks: inserting in the middle of a std::vector is faster than std::list for lists up to ~500K elements, because cache locality dominates. Don't reach for linked lists by default — profile first.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Stack -->
+    <div id="r-stack" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(0,255,200,.1);color:var(--accent2)">ST</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent2)">Recommended structure</div>
+          <div class="result-db" style="color:var(--accent2)">Stack (LIFO)</div>
+          <div class="result-tagline" style="color:var(--text2)">Last in, first out. Push and pop in O(1). The data structure behind recursion itself.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(1) push</span>
+        <span class="tag tag-g">O(1) pop</span>
+        <span class="tag tag-g">O(1) peek</span>
+        <span class="tag tag-t">array-backed in practice</span>
+        <span class="tag tag-a">no random access</span>
+      </div>
+      <div class="section-block">
+        <h4>Why it matters</h4>
+        <p>Every function call in every program uses a stack (the call stack). When function A calls function B, A's state is pushed. When B returns, A's state is popped. Stacks also power DFS, expression evaluation, undo systems, and backtracking algorithms. The LIFO discipline means the most recent context is always what you work with.</p>
+      </div>
+      <div class="section-block">
+        <h4>Time complexity</h4>
+        <div class="metric-row"><span class="metric-k">Push (add to top)</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Pop (remove from top)</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Peek (view top)</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Search</span><span class="metric-v bad">O(n)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Classic applications</h4>
+        <div class="ds-visual"><span class="cm">// 1. Balanced parentheses: push open, pop on close, check match</span>
+input:  ( [ { } ] )
+stack:  (  →  ( [  →  ( [ {  →  ( [  →  (  →  ∅  ✓
+
+<span class="cm">// 2. DFS traversal: push neighbors, pop to visit</span>
+push(start)
+<span class="kw">while</span> stack not empty:
+    node = pop()
+    <span class="kw">for</span> neighbor <span class="kw">in</span> node.neighbors:
+        <span class="kw">if</span> not visited: push(neighbor)
+
+<span class="cm">// 3. Undo system: each action pushed, Ctrl+Z pops</span>
+do(action)   → push(action)
+undo()       → pop() and reverse it</div>
+      </div>
+      <div class="callout info">In system design: the call stack is limited (~1MB default on most OSes, ~8MB on Linux). Deep recursion (100k+ frames) causes stack overflow. Convert to an explicit stack (heap-allocated) for deep traversals. This is why iterative DFS is preferred over recursive DFS in production code.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Queue -->
+    <div id="r-queue" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(0,255,200,.1);color:var(--accent2)">Q</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent2)">Recommended structure</div>
+          <div class="result-db" style="color:var(--accent2)">Queue (FIFO)</div>
+          <div class="result-tagline" style="color:var(--text2)">First in, first out. Fair ordering. The backbone of BFS, scheduling, and message passing.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(1) enqueue</span>
+        <span class="tag tag-g">O(1) dequeue</span>
+        <span class="tag tag-g">O(1) peek</span>
+        <span class="tag tag-t">circular array or linked list backed</span>
+        <span class="tag tag-a">no random access</span>
+      </div>
+      <div class="section-block">
+        <h4>Why it matters</h4>
+        <p>Queues enforce fairness — whoever arrives first gets served first. BFS uses a queue to explore nodes level-by-level, which is why it finds shortest paths in unweighted graphs. In system design, message queues (SQS, RabbitMQ) are just distributed queues. Thread pools, task schedulers, and print spoolers are all queues.</p>
+      </div>
+      <div class="section-block">
+        <h4>Time complexity</h4>
+        <div class="metric-row"><span class="metric-k">Enqueue (add to back)</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Dequeue (remove from front)</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Peek (view front)</span><span class="metric-v good">O(1)</span></div>
+        <div class="metric-row"><span class="metric-k">Search</span><span class="metric-v bad">O(n)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Implementation: circular array</h4>
+        <div class="ds-visual"><span class="cm">// Naive array queue wastes space as you dequeue.</span>
+<span class="cm">// Circular array: head and tail wrap around.</span>
+
+capacity=6, size=4
+         head              tail
+          ↓                 ↓
+┌─────┬─────┬─────┬─────┬─────┬─────┐
+│     │  B  │  C  │  D  │  E  │     │
+└─────┴─────┴─────┴─────┴─────┴─────┘
+  [0]   [1]   [2]   [3]   [4]   [5]
+
+enqueue(F) → tail = (tail+1) % capacity
+dequeue()  → head = (head+1) % capacity
+
+<span class="cm">// No shifting. No wasted space. O(1) everything.</span></div>
+      </div>
+      <div class="callout info">Queue → BFS → shortest path in unweighted graphs. Stack → DFS → topological sort, cycle detection. The data structure determines the algorithm. This is the single most important connection in CS 61B.</div>
+      <div class="callout good">Deque (double-ended queue) gives you O(1) operations at both ends. Java's ArrayDeque is faster than both Stack and LinkedList for both stack and queue use cases. In practice, always use ArrayDeque.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- BST -->
+    <div id="r-bst" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(251,191,36,.1);color:var(--amber)">BST</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--amber)">Recommended structure</div>
+          <div class="result-db" style="color:var(--amber)">Binary Search Tree</div>
+          <div class="result-tagline" style="color:var(--text2)">Ordered data with O(log n) average-case search, insert, delete. The foundation of all tree-based structures.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(log n) average search</span>
+        <span class="tag tag-g">O(log n) average insert</span>
+        <span class="tag tag-g">in-order traversal = sorted</span>
+        <span class="tag tag-r">O(n) worst case (degenerate)</span>
+        <span class="tag tag-a">no balance guarantee</span>
+      </div>
+      <div class="section-block">
+        <h4>The invariant</h4>
+        <p>For every node: all keys in the left subtree are smaller, all keys in the right subtree are larger. This single rule gives you O(log n) search — at each node, you eliminate half the remaining tree. In-order traversal (left → root → right) visits nodes in sorted order, which is why BSTs power ordered maps and sets.</p>
+      </div>
+      <div class="section-block">
+        <h4>Time complexity</h4>
+        <div class="metric-row"><span class="metric-k">Search (average, balanced)</span><span class="metric-v good">O(log n)</span></div>
+        <div class="metric-row"><span class="metric-k">Search (worst, degenerate)</span><span class="metric-v bad">O(n)</span></div>
+        <div class="metric-row"><span class="metric-k">Insert (average)</span><span class="metric-v good">O(log n)</span></div>
+        <div class="metric-row"><span class="metric-k">Delete (average)</span><span class="metric-v good">O(log n)</span></div>
+        <div class="metric-row"><span class="metric-k">In-order traversal</span><span class="metric-v good">O(n) — visits every node once</span></div>
+        <div class="metric-row"><span class="metric-k">Find min/max</span><span class="metric-v good">O(log n) — leftmost/rightmost</span></div>
+      </div>
+      <div class="section-block">
+        <h4>The degenerate case</h4>
+        <div class="ds-visual"><span class="cm">// Balanced BST (random insertion order)</span>
+        8
+       / \
+      4   12
+     / \  / \
+    2  6 10 14    height = O(log n)
+
+<span class="cm">// Degenerate BST (sorted insertion: 2,4,6,8,10)</span>
+    2
+     \
+      4
+       \
+        6         height = O(n)
+         \        literally a linked list
+          8
+           \
+            10</div>
+      </div>
+      <div class="callout danger">If you insert sorted data into a plain BST, you get a linked list with O(n) operations. This is why balanced BSTs (Red-Black, AVL) exist. If your data could arrive in any order — including sorted — you need a self-balancing tree.</div>
+      <div class="callout info">BST deletion has three cases: (1) leaf — just remove, (2) one child — replace with child, (3) two children — replace with in-order successor (leftmost node in right subtree), then delete that successor. Case 3 is the tricky interview question.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Red-Black Tree -->
+    <div id="r-redblack" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(248,113,113,.1);color:var(--red)">RB</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--red)">Recommended structure</div>
+          <div class="result-db" style="color:var(--red)">Red-Black Tree</div>
+          <div class="result-tagline" style="color:var(--text2)">Self-balancing BST. Guaranteed O(log n) everything. The tree behind TreeMap, TreeSet, and the Linux scheduler.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(log n) guaranteed search</span>
+        <span class="tag tag-g">O(log n) guaranteed insert</span>
+        <span class="tag tag-g">O(log n) guaranteed delete</span>
+        <span class="tag tag-a">complex implementation</span>
+        <span class="tag tag-b">max height: 2·log₂(n+1)</span>
+      </div>
+      <div class="section-block">
+        <h4>The five rules</h4>
+        <p>1. Every node is red or black. 2. The root is black. 3. Every null leaf is black. 4. Red nodes can't have red children (no red-red). 5. Every path from root to null leaf has the same number of black nodes (black-height). These five rules guarantee the tree height stays ≤ 2·log₂(n+1), which means O(log n) worst-case for everything.</p>
+      </div>
+      <div class="section-block">
+        <h4>Time complexity</h4>
+        <div class="metric-row"><span class="metric-k">Search</span><span class="metric-v good">O(log n) guaranteed</span></div>
+        <div class="metric-row"><span class="metric-k">Insert</span><span class="metric-v good">O(log n) + max 2 rotations</span></div>
+        <div class="metric-row"><span class="metric-k">Delete</span><span class="metric-v good">O(log n) + max 3 rotations</span></div>
+        <div class="metric-row"><span class="metric-k">Space</span><span class="metric-v warn">+1 bit per node (color)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Red-Black vs AVL</h4>
+        <div class="compare-grid">
+          <div class="compare-cell">
+            <h5 style="color:var(--red)">Red-Black Tree</h5>
+            <p>Looser balance: height ≤ 2·log₂(n). Fewer rotations on insert/delete (max 2-3). Faster writes. Used in: Java TreeMap, C++ std::map, Linux CFS scheduler.</p>
+          </div>
+          <div class="compare-cell">
+            <h5 style="color:var(--accent5)">AVL Tree</h5>
+            <p>Stricter balance: height ≤ 1.44·log₂(n). More rotations to maintain balance. Faster reads (shorter tree). Used in: databases, memory-constrained lookup tables.</p>
+          </div>
+        </div>
+      </div>
+      <div class="section-block">
+        <h4>Rotation intuition</h4>
+        <div class="ds-visual"><span class="cm">// Left rotation at node X (X becomes left child of Y)</span>
+
+    X                  Y
+   / \       →        / \
+  a   Y              X   c
+     / \            / \
+    b   c          a   b
+
+<span class="cm">// Right rotation is the mirror. These are the only two</span>
+<span class="cm">// operations needed to rebalance any BST.</span>
+<span class="cm">// Insert: walk down, color red, fix violations going up.</span>
+<span class="cm">// At most 2 rotations to fix after insert.</span></div>
+      </div>
+      <div class="callout good">You almost never implement a Red-Black tree yourself. Java's TreeMap/TreeSet, C++'s std::map/std::set, and Python's sortedcontainers all use self-balancing BSTs internally. Know the guarantees — O(log n) everything, ordered iteration — not the rotation cases.</div>
+      <div class="callout info">The Left-Leaning Red-Black tree (LLRB), from Sedgewick, simplifies implementation to ~40 lines of code by adding one extra invariant: red links lean left. This is what CS 61B teaches. Same O(log n) guarantees with much less case analysis.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- B-Tree -->
+    <div id="r-btree" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(232,255,0,.1);color:var(--accent)">BT</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent)">Recommended structure</div>
+          <div class="result-db" style="color:var(--accent)">B-Tree</div>
+          <div class="result-tagline" style="color:var(--text2)">Wide, shallow, disk-optimised. Every database index is a B-Tree. 1 billion keys in 3 disk reads.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(log n) search, insert, delete</span>
+        <span class="tag tag-g">minimises disk I/O</span>
+        <span class="tag tag-y">every database uses this</span>
+        <span class="tag tag-b">node = 1 disk page (4–16KB)</span>
+        <span class="tag tag-a">more complex than binary trees</span>
+      </div>
+      <div class="section-block">
+        <h4>Why not a binary tree on disk?</h4>
+        <p>A binary tree with 1 billion nodes has height ~30. Each node is one disk read. That's 30 disk reads per lookup — at 10ms per HDD seek, that's 300ms. Unacceptable. A B-Tree with order 1000 stores ~1000 keys per node. Height is log₁₀₀₀(1B) ≈ 3. Three disk reads instead of thirty. Each node fits in one disk page (4–16KB), so you read it in a single I/O operation.</p>
+      </div>
+      <div class="section-block">
+        <h4>Time complexity</h4>
+        <div class="metric-row"><span class="metric-k">Search</span><span class="metric-v good">O(log_b n) — b = branching factor</span></div>
+        <div class="metric-row"><span class="metric-k">Insert</span><span class="metric-v good">O(log_b n) + possible split</span></div>
+        <div class="metric-row"><span class="metric-k">Delete</span><span class="metric-v good">O(log_b n) + possible merge</span></div>
+        <div class="metric-row"><span class="metric-k">Disk reads per operation</span><span class="metric-v good">= tree height (typically 3–4)</span></div>
+        <div class="metric-row"><span class="metric-k">Range scan</span><span class="metric-v good">B+Tree: sequential leaf scan</span></div>
+      </div>
+      <div class="section-block">
+        <h4>B-Tree vs B+Tree</h4>
+        <div class="compare-grid">
+          <div class="compare-cell">
+            <h5 style="color:var(--accent)">B-Tree</h5>
+            <p>Keys + data in both internal and leaf nodes. Slightly faster point lookups if the key is found early (internal node). Less common in practice.</p>
+          </div>
+          <div class="compare-cell">
+            <h5 style="color:var(--accent)">B+Tree (databases use this)</h5>
+            <p>Data only in leaf nodes. Internal nodes are pure index. Leaves are linked for fast range scans. More keys per internal node = shallower tree. This is what Postgres, MySQL, and SQLite actually use.</p>
+          </div>
+        </div>
+      </div>
+      <div class="section-block">
+        <h4>Structure</h4>
+        <div class="ds-visual"><span class="cm">// B+Tree with order 4 (max 3 keys per node)</span>
+
+            ┌──────────────┐
+            │   10  │  20  │          internal node
+            └──┬──────┬────┘          (keys only, no data)
+              /       |      \
+   ┌────────┐  ┌──────────┐  ┌──────────────┐
+   │ 1,3,7  │→ │ 10,14,18 │→ │ 20, 25, 30  │   leaf nodes
+   └────────┘  └──────────┘  └──────────────┘   (keys + data)
+                                                  linked →
+
+<span class="cm">// Range query "WHERE x BETWEEN 7 AND 18":</span>
+<span class="cm">// 1. Binary search internal nodes → find leaf with 7</span>
+<span class="cm">// 2. Scan right through linked leaves until 18</span>
+<span class="cm">// Sequential I/O — fast even on spinning disks.</span></div>
+      </div>
+      <div class="callout good">When someone says "add an index" in a database interview, they mean "build a B+Tree on that column." The index maps column values to row pointers. CREATE INDEX is literally "construct a B+Tree." Understanding this makes database performance intuition click.</div>
+      <div class="callout info">LSM-Trees (Log-Structured Merge Trees) are the write-optimised alternative. Instead of updating the B-Tree in place, writes go to an in-memory buffer, then flush as sorted runs. Used by Cassandra, RocksDB, LevelDB. Trade read speed for write speed.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Binary Heap -->
+    <div id="r-heap" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(167,139,250,.1);color:var(--accent4)">HP</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent4)">Recommended structure</div>
+          <div class="result-db" style="color:var(--accent4)">Binary Heap</div>
+          <div class="result-tagline" style="color:var(--text2)">O(1) peek at min/max. O(log n) insert and extract. Array-backed — no pointers, no overhead.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(1) find-min/max</span>
+        <span class="tag tag-g">O(log n) insert</span>
+        <span class="tag tag-g">O(log n) extract-min/max</span>
+        <span class="tag tag-g">array-backed, cache-friendly</span>
+        <span class="tag tag-r">O(n) search for arbitrary element</span>
+        <span class="tag tag-a">not sorted — only min/max guaranteed</span>
+      </div>
+      <div class="section-block">
+        <h4>Why it works</h4>
+        <p>A binary heap is a complete binary tree stored in an array. The heap property: every parent ≤ its children (min-heap) or ≥ its children (max-heap). The root is always the min (or max). Insert at the end and "bubble up." Extract-min by swapping root with last element, then "sink down." Both operations follow one path from root to leaf — O(log n).</p>
+      </div>
+      <div class="section-block">
+        <h4>Time complexity</h4>
+        <div class="metric-row"><span class="metric-k">Peek min/max</span><span class="metric-v good">O(1) — it's always the root</span></div>
+        <div class="metric-row"><span class="metric-k">Insert</span><span class="metric-v good">O(log n) — bubble up</span></div>
+        <div class="metric-row"><span class="metric-k">Extract min/max</span><span class="metric-v good">O(log n) — sink down</span></div>
+        <div class="metric-row"><span class="metric-k">Build heap from array</span><span class="metric-v good">O(n) — not O(n log n)!</span></div>
+        <div class="metric-row"><span class="metric-k">Search arbitrary element</span><span class="metric-v bad">O(n) — no ordering beyond parent-child</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Array representation</h4>
+        <div class="ds-visual"><span class="cm">// Min-heap as a tree:</span>
+          1
+        /   \
+       3     5
+      / \   /
+     7   4 8
+
+<span class="cm">// Same heap as an array (level-order):</span>
+index:  [0]  [1]  [2]  [3]  [4]  [5]
+value:   1    3    5    7    4    8
+
+<span class="cm">// Navigation by arithmetic — no pointers needed:</span>
+parent(i)     = (i - 1) / 2
+leftChild(i)  = 2i + 1
+rightChild(i) = 2i + 2
+
+<span class="cm">// Insert 2: place at end [6], bubble up</span>
+<span class="cm">// [6]→parent[2]=5 → swap → [2]→parent[0]=1 → stop</span></div>
+      </div>
+      <div class="callout good">Heapify (build a heap from an unordered array) is O(n), not O(n log n). The insight: leaves (half the nodes) need zero work. Nodes at height h need O(h) work. The sum converges to O(n). This is a common interview trick question.</div>
+      <div class="callout info">Classic applications: (1) Find the k-th largest element — O(n) with quickselect or O(n log k) with a min-heap of size k. (2) Merge k sorted lists — O(n log k) using a min-heap. (3) Median maintenance — one max-heap for lower half, one min-heap for upper half.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Priority Queue / decrease-key -->
+    <div id="r-pq" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(167,139,250,.1);color:var(--accent4)">PQ</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent4)">Recommended structure</div>
+          <div class="result-db" style="color:var(--accent4)">Priority Queue with decrease-key</div>
+          <div class="result-tagline" style="color:var(--text2)">Binary heap + index map for O(log n) decrease-key. The engine inside Dijkstra and Prim's MST.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(log n) insert</span>
+        <span class="tag tag-g">O(log n) extract-min</span>
+        <span class="tag tag-g">O(log n) decrease-key</span>
+        <span class="tag tag-b">indexed binary heap</span>
+        <span class="tag tag-p">Fibonacci heap: O(1) amortized decrease-key</span>
+      </div>
+      <div class="section-block">
+        <h4>Why decrease-key matters</h4>
+        <p>In Dijkstra's algorithm, you discover shorter paths to nodes already in the queue. You need to update their priority without removing and reinserting. A plain binary heap can't find an arbitrary element efficiently. An indexed priority queue adds a HashMap from element → heap index, giving you O(log n) decrease-key.</p>
+      </div>
+      <div class="section-block">
+        <h4>Implementation comparison</h4>
+        <div class="metric-row"><span class="metric-k">Binary heap — insert</span><span class="metric-v good">O(log n)</span></div>
+        <div class="metric-row"><span class="metric-k">Binary heap — extract-min</span><span class="metric-v good">O(log n)</span></div>
+        <div class="metric-row"><span class="metric-k">Binary heap — decrease-key</span><span class="metric-v warn">O(n) search + O(log n) bubble</span></div>
+        <div class="metric-row"><span class="metric-k">Indexed binary heap — decrease-key</span><span class="metric-v good">O(log n) via index map</span></div>
+        <div class="metric-row"><span class="metric-k">Fibonacci heap — decrease-key</span><span class="metric-v good">O(1) amortized</span></div>
+        <div class="metric-row"><span class="metric-k">Fibonacci heap — extract-min</span><span class="metric-v good">O(log n) amortized</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Dijkstra's inner loop</h4>
+        <div class="ds-visual"><span class="cm">// Dijkstra = BFS + Priority Queue</span>
+<span class="cm">// Instead of a FIFO queue, use a min-heap keyed by distance</span>
+
+dist[start] = <span class="num">0</span>
+pq.insert(start, <span class="num">0</span>)
+
+<span class="kw">while</span> pq not empty:
+    u = pq.extractMin()
+    <span class="kw">for</span> (v, weight) <span class="kw">in</span> neighbors(u):
+        <span class="kw">if</span> dist[u] + weight &lt; dist[v]:
+            dist[v] = dist[u] + weight
+            pq.decreaseKey(v, dist[v])  <span class="cm">// ← this is why we need it</span>
+
+<span class="cm">// Without decrease-key: insert duplicate entries,</span>
+<span class="cm">// skip stale ones when extracted. Lazy approach — works</span>
+<span class="cm">// but uses more memory: O(E) heap size vs O(V).</span></div>
+      </div>
+      <div class="callout info">In practice, most implementations use the "lazy" approach: insert a new (distance, node) pair instead of decreasing the key. When you extract a node with a stale distance, just skip it. This avoids the need for an indexed heap and is simpler to implement. Dijkstra still runs in O((V+E) log V) either way.</div>
+      <div class="callout warn">Fibonacci heaps have better theoretical complexity (O(1) decrease-key) but terrible constant factors and cache behaviour. In practice, a binary heap with the lazy approach beats Fibonacci heaps for all but astronomically large graphs. Theory ≠ practice.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- BFS -->
+    <div id="r-bfs" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.1);color:var(--accent5)">BFS</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent5)">Recommended algorithm</div>
+          <div class="result-db" style="color:var(--accent5)">Breadth-First Search</div>
+          <div class="result-tagline" style="color:var(--text2)">Explore level by level. Shortest path in unweighted graphs. Uses a Queue.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(V + E) time</span>
+        <span class="tag tag-g">shortest path (unweighted)</span>
+        <span class="tag tag-b">uses a Queue (FIFO)</span>
+        <span class="tag tag-a">O(V) memory — stores entire frontier</span>
+      </div>
+      <div class="section-block">
+        <h4>Why it finds shortest paths</h4>
+        <p>BFS visits all nodes at distance d before any node at distance d+1. This level-by-level expansion guarantees that the first time you reach a node, you've found the shortest path to it (in an unweighted graph). The Queue enforces this order — nodes discovered first are explored first (FIFO).</p>
+      </div>
+      <div class="section-block">
+        <h4>Complexity</h4>
+        <div class="metric-row"><span class="metric-k">Time</span><span class="metric-v good">O(V + E)</span></div>
+        <div class="metric-row"><span class="metric-k">Space (queue + visited)</span><span class="metric-v warn">O(V)</span></div>
+        <div class="metric-row"><span class="metric-k">Shortest path guarantee</span><span class="metric-v good">Yes (unweighted only)</span></div>
+        <div class="metric-row"><span class="metric-k">Works on disconnected graphs?</span><span class="metric-v warn">Only finds component containing start</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Algorithm</h4>
+        <div class="ds-visual"><span class="kw">function</span> bfs(graph, start):
+    queue = [start]
+    visited = {start}
+    dist = {start: <span class="num">0</span>}
+
+    <span class="kw">while</span> queue not empty:
+        node = queue.dequeue()       <span class="cm">// FIFO — process oldest first</span>
+        <span class="kw">for</span> neighbor <span class="kw">in</span> graph[node]:
+            <span class="kw">if</span> neighbor not <span class="kw">in</span> visited:
+                visited.add(neighbor)
+                dist[neighbor] = dist[node] + <span class="num">1</span>
+                queue.enqueue(neighbor)
+
+    <span class="kw">return</span> dist
+
+<span class="cm">// Traversal order (level by level):</span>
+<span class="cm">//      A          Level 0: A</span>
+<span class="cm">//     / \         Level 1: B, C</span>
+<span class="cm">//    B   C        Level 2: D, E, F</span>
+<span class="cm">//   /|    \</span>
+<span class="cm">//  D  E    F</span></div>
+      </div>
+      <div class="callout info">System design applications: (1) Social network "people you may know" — BFS from a user, friends-of-friends at distance 2. (2) Web crawler — BFS ensures you index pages closest to seed URLs first. (3) Network broadcast — packets propagate BFS-style through a network.</div>
+      <div class="callout warn">BFS stores the entire frontier (all nodes at the current distance) in memory. For graphs where the frontier grows exponentially (e.g., branching factor 50, depth 6 = 15 billion nodes), BFS runs out of memory. Consider bidirectional BFS or iterative deepening DFS.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- DFS -->
+    <div id="r-dfs" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(56,189,248,.1);color:var(--accent5)">DFS</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent5)">Recommended algorithm</div>
+          <div class="result-db" style="color:var(--accent5)">Depth-First Search</div>
+          <div class="result-tagline" style="color:var(--text2)">Go deep, then backtrack. Topological sort, cycle detection, connected components. Uses a Stack.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O(V + E) time</span>
+        <span class="tag tag-g">O(V) space (stack depth)</span>
+        <span class="tag tag-b">uses a Stack (LIFO) or recursion</span>
+        <span class="tag tag-r">does NOT find shortest paths</span>
+        <span class="tag tag-t">topological sort, cycle detection</span>
+      </div>
+      <div class="section-block">
+        <h4>Why DFS over BFS?</h4>
+        <p>DFS explores one path to its end before backtracking. This makes it natural for: (1) topological sort — post-order gives reverse topo order, (2) cycle detection — a back edge to a node on the current path means a cycle, (3) connected components — one DFS from each unvisited node, (4) maze generation — random DFS creates interesting mazes. DFS also uses less memory when the graph is deep but narrow.</p>
+      </div>
+      <div class="section-block">
+        <h4>Complexity</h4>
+        <div class="metric-row"><span class="metric-k">Time</span><span class="metric-v good">O(V + E)</span></div>
+        <div class="metric-row"><span class="metric-k">Space (recursive)</span><span class="metric-v warn">O(V) call stack depth</span></div>
+        <div class="metric-row"><span class="metric-k">Space (iterative)</span><span class="metric-v good">O(V) explicit stack</span></div>
+        <div class="metric-row"><span class="metric-k">Finds shortest path?</span><span class="metric-v bad">No</span></div>
+        <div class="metric-row"><span class="metric-k">Detects cycles?</span><span class="metric-v good">Yes (directed &amp; undirected)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Algorithm &amp; topological sort</h4>
+        <div class="ds-visual"><span class="cm">// Iterative DFS</span>
+<span class="kw">function</span> dfs(graph, start):
+    stack = [start]
+    visited = {}
+
+    <span class="kw">while</span> stack not empty:
+        node = stack.pop()          <span class="cm">// LIFO — go deep</span>
+        <span class="kw">if</span> node <span class="kw">in</span> visited: <span class="kw">continue</span>
+        visited.add(node)
+        <span class="kw">for</span> neighbor <span class="kw">in</span> graph[node]:
+            <span class="kw">if</span> neighbor not <span class="kw">in</span> visited:
+                stack.push(neighbor)
+
+<span class="cm">// Topological sort (course prerequisites)</span>
+<span class="cm">// Post-order DFS: add node to result AFTER visiting all descendants</span>
+<span class="cm">// Reverse the result → topological order</span>
+<span class="cm">//</span>
+<span class="cm">// CS61A → CS61B → CS61C → CS170</span>
+<span class="cm">//                  ↘ CS162</span>
+<span class="cm">// Topo order: CS61A, CS61B, CS61C, CS170, CS162</span></div>
+      </div>
+      <div class="callout info">DFS is the backbone of compiler design. Dependency resolution in build systems (Make, Gradle), package managers (npm, pip), and import analysis all use topological sort via DFS. If there's a cycle in dependencies, DFS detects it during traversal.</div>
+      <div class="callout danger">Recursive DFS on deep graphs can blow the call stack (StackOverflowError). The default JVM stack is ~512KB (~10K–20K frames). For graphs with diameter > 10K, use iterative DFS with an explicit stack on the heap.</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+    <!-- Dijkstra -->
+    <div id="r-dijkstra" class="state">
+      <div class="result-header">
+        <div class="result-icon" style="background:rgba(255,107,53,.1);color:var(--accent3)">DJ</div>
+        <div class="result-title-wrap">
+          <div class="result-verdict" style="color:var(--accent3)">Recommended algorithm</div>
+          <div class="result-db" style="color:var(--accent3)">Dijkstra's Algorithm</div>
+          <div class="result-tagline" style="color:var(--text2)">Shortest path in weighted graphs. BFS + priority queue. The algorithm behind every GPS and network router.</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="tag tag-g">O((V + E) log V) with min-heap</span>
+        <span class="tag tag-g">optimal for non-negative weights</span>
+        <span class="tag tag-b">uses Priority Queue</span>
+        <span class="tag tag-r">no negative edge weights</span>
+        <span class="tag tag-a">greedy — processes closest node first</span>
+      </div>
+      <div class="section-block">
+        <h4>The key insight</h4>
+        <p>Dijkstra is just BFS where the queue is a priority queue keyed by distance. BFS processes nodes in FIFO order (all distance-1 before distance-2). Dijkstra processes nodes in order of their current shortest known distance. The greedy choice works because with non-negative weights, once you process a node, no shorter path to it can exist.</p>
+      </div>
+      <div class="section-block">
+        <h4>Complexity</h4>
+        <div class="metric-row"><span class="metric-k">Time (binary heap)</span><span class="metric-v good">O((V + E) log V)</span></div>
+        <div class="metric-row"><span class="metric-k">Time (Fibonacci heap)</span><span class="metric-v good">O(E + V log V)</span></div>
+        <div class="metric-row"><span class="metric-k">Space</span><span class="metric-v warn">O(V) for dist array + heap</span></div>
+        <div class="metric-row"><span class="metric-k">Negative weights?</span><span class="metric-v bad">No — use Bellman-Ford</span></div>
+        <div class="metric-row"><span class="metric-k">Single-source?</span><span class="metric-v good">Yes — shortest to ALL nodes from start</span></div>
+      </div>
+      <div class="section-block">
+        <h4>Algorithm</h4>
+        <div class="ds-visual"><span class="kw">function</span> dijkstra(graph, start):
+    dist = {v: ∞ <span class="kw">for</span> v <span class="kw">in</span> graph}
+    dist[start] = <span class="num">0</span>
+    pq = MinHeap()
+    pq.insert(start, <span class="num">0</span>)
+
+    <span class="kw">while</span> pq not empty:
+        (u, d) = pq.extractMin()
+        <span class="kw">if</span> d > dist[u]: <span class="kw">continue</span>     <span class="cm">// stale entry, skip</span>
+
+        <span class="kw">for</span> (v, weight) <span class="kw">in</span> graph[u]:
+            newDist = dist[u] + weight
+            <span class="kw">if</span> newDist &lt; dist[v]:
+                dist[v] = newDist
+                pq.insert(v, newDist)   <span class="cm">// lazy: insert, don't decrease-key</span>
+
+    <span class="kw">return</span> dist
+
+<span class="cm">// Example: A→B(4), A→C(1), C→B(2)</span>
+<span class="cm">// Process A: dist[B]=4, dist[C]=1</span>
+<span class="cm">// Process C (closest): dist[B]=min(4, 1+2)=3  ← relaxation</span>
+<span class="cm">// Process B: done. Shortest A→B = 3 (via C)</span></div>
+      </div>
+      <div class="section-block">
+        <h4>The evolution: Queue → Stack → Priority Queue</h4>
+        <div class="ds-visual"><span class="cm">// The data structure IS the algorithm:</span>
+
+BFS      + Queue          = shortest path (unweighted)
+DFS      + Stack          = topological sort, cycle detection
+Dijkstra + Priority Queue = shortest path (weighted)
+
+<span class="cm">// Same traversal skeleton, different frontier ordering.</span>
+<span class="cm">// This is the deepest insight from CS 61B.</span></div>
+      </div>
+      <div class="callout good">Google Maps doesn't run vanilla Dijkstra. It uses A* (Dijkstra + heuristic) and contraction hierarchies (precomputed shortcuts). But the core is still Dijkstra's relaxation: "if I found a shorter path to you through me, update your distance." Every routing algorithm builds on this.</div>
+      <div class="callout warn">Why no negative weights? Dijkstra's greedy choice assumes once a node is processed, its distance is final. A negative edge could create a shorter path through an already-processed node, breaking this invariant. For negative weights (but no negative cycles), use Bellman-Ford in O(VE).</div>
+      <div class="nav-actions"><button class="btn" onclick="goBack()">← back</button><button class="btn btn-primary" onclick="restart()">start over</button></div>
+    </div>
+
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="right-panel">
+    <div class="rp-section">
+      <div class="rp-label">Structure reference</div>
+      <div id="db-cards">
+        <div class="db-card" id="dsc-array">
+          <div class="db-card-name">Array</div>
+          <div class="db-card-meta">Contiguous memory. Fixed size. Index access.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(1) access</span>
+            <span class="db-stat">O(n) insert</span>
+          </div>
+        </div>
+        <div class="db-card" id="dsc-arraylist">
+          <div class="db-card-name">ArrayList</div>
+          <div class="db-card-meta">Dynamic array. Doubles when full.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(1) append*</span>
+            <span class="db-stat">O(1) access</span>
+          </div>
+        </div>
+        <div class="db-card" id="dsc-linkedlist">
+          <div class="db-card-name">Linked List</div>
+          <div class="db-card-meta">Node + pointer. O(1) insert at known position.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(1) insert</span>
+            <span class="db-stat">O(n) access</span>
+          </div>
+        </div>
+        <div class="db-card" id="dsc-stack">
+          <div class="db-card-name">Stack</div>
+          <div class="db-card-meta">LIFO. Push/pop. Recursion, undo, DFS.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(1) push</span>
+            <span class="db-stat">O(1) pop</span>
+          </div>
+        </div>
+        <div class="db-card" id="dsc-queue">
+          <div class="db-card-name">Queue</div>
+          <div class="db-card-meta">FIFO. Enqueue/dequeue. Scheduling, BFS.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(1) enq</span>
+            <span class="db-stat">O(1) deq</span>
+          </div>
+        </div>
+        <div class="db-card" id="dsc-heap">
+          <div class="db-card-name">Binary Heap</div>
+          <div class="db-card-meta">Array-backed tree. Min/max always at root.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(1) peek</span>
+            <span class="db-stat">O(log n) insert</span>
+          </div>
+        </div>
+        <div class="db-card" id="dsc-bst">
+          <div class="db-card-name">BST</div>
+          <div class="db-card-meta">Binary search tree. Sorted order. O(log n) avg.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(log n) avg</span>
+            <span class="db-stat">O(n) worst</span>
+          </div>
+        </div>
+        <div class="db-card" id="dsc-redblack">
+          <div class="db-card-name">Red-Black Tree</div>
+          <div class="db-card-meta">Self-balancing BST. TreeMap/TreeSet.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(log n) all</span>
+            <span class="db-stat">guaranteed</span>
+          </div>
+        </div>
+        <div class="db-card" id="dsc-btree">
+          <div class="db-card-name">B-Tree / B+Tree</div>
+          <div class="db-card-meta">Disk-optimised. Every DB index. Wide + shallow.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(log_b n)</span>
+            <span class="db-stat">3 disk reads</span>
+          </div>
+        </div>
+        <div class="db-card" id="dsc-graph">
+          <div class="db-card-name">Graph (adj. list)</div>
+          <div class="db-card-meta">Vertices + edges. BFS/DFS/Dijkstra.</div>
+          <div class="db-card-stats">
+            <span class="db-stat">O(V+E) traversal</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="rp-section">
+      <div class="rp-label">CS 61B golden rules</div>
+      <div class="rule-item"><span class="rule-num">01</span><span>ArrayList beats LinkedList in practice for almost everything. Cache locality > theoretical complexity.</span></div>
+      <div class="rule-item"><span class="rule-num">02</span><span>The data structure determines the algorithm: Queue→BFS, Stack→DFS, PQ→Dijkstra.</span></div>
+      <div class="rule-item"><span class="rule-num">03</span><span>Hash tables give O(1) average but no ordering. Trees give O(log n) with ordering. Know when you need order.</span></div>
+      <div class="rule-item"><span class="rule-num">04</span><span>B-Trees exist because RAM is fast and disk is slow. Every "CREATE INDEX" is a B+Tree.</span></div>
+      <div class="rule-item"><span class="rule-num">05</span><span>Amortized ≠ worst case. ArrayList append is O(1) amortized but O(n) worst case. Know the difference for real-time systems.</span></div>
+      <div class="rule-item"><span class="rule-num">06</span><span>Every self-balancing BST (Red-Black, AVL, 2-3) is O(log n) everything. Pick by write/read ratio, not by name.</span></div>
+      <div class="rule-item"><span class="rule-num">07</span><span>Dijkstra fails with negative edges. Bellman-Ford handles negatives. Floyd-Warshall handles all-pairs. Match algorithm to constraint.</span></div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+const history = [];
+const stateLabels = {
+  'q0':'Start','q1-sequential':'Sequential','q1-ordered':'Ordered search','q1-priority':'Priority','q1-graph':'Graph traversal',
+  'q2-restricted':'Restricted access',
+  'r-array':'Array','r-arraylist':'ArrayList','r-linkedlist':'Linked List','r-stack':'Stack','r-queue':'Queue',
+  'r-bst':'BST','r-redblack':'Red-Black Tree','r-btree':'B-Tree',
+  'r-heap':'Binary Heap','r-pq':'Priority Queue',
+  'r-bfs':'BFS','r-dfs':'DFS','r-dijkstra':'Dijkstra'
+};
+const resultHighlights = {
+  'r-array':'dsc-array','r-arraylist':'dsc-arraylist','r-linkedlist':'dsc-linkedlist',
+  'r-stack':'dsc-stack','r-queue':'dsc-queue',
+  'r-bst':'dsc-bst','r-redblack':'dsc-redblack','r-btree':'dsc-btree',
+  'r-heap':'dsc-heap','r-pq':'dsc-heap',
+  'r-bfs':'dsc-graph','r-dfs':'dsc-graph','r-dijkstra':'dsc-graph'
+};
+const totalDepth = 3;
+
+function go(nextId, label) {
+  const cur = document.querySelector('.state.on');
+  history.push({ id: cur.id, label });
+  cur.classList.remove('on');
+  document.getElementById(nextId).classList.add('on');
+  updateUI(nextId);
+}
+
+function goBack() {
+  if (!history.length) return;
+  const prev = history.pop();
+  document.querySelector('.state.on').classList.remove('on');
+  document.getElementById(prev.id).classList.add('on');
+  updateUI(prev.id);
+}
+
+function restart() {
+  history.length = 0;
+  document.querySelector('.state.on').classList.remove('on');
+  document.getElementById('q0').classList.add('on');
+  updateUI('q0');
+}
+
+function updateUI(currentId) {
+  // Breadcrumb
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = history.map((h, i) =>
+    `<span class="bc-item">${h.label}</span>${i < history.length - 1 ? '<span class="bc-sep">›</span>' : ''}`
+  ).join('');
+
+  // Progress
+  const fill = document.getElementById('progress-fill');
+  const label = document.getElementById('step-label');
+  const depth = history.length;
+  const pct = Math.min(100, (depth / totalDepth) * 100);
+  fill.style.width = pct + '%';
+  label.textContent = `step ${depth}`;
+
+  // Highlight result card
+  document.querySelectorAll('.db-card').forEach(c => c.classList.remove('highlight'));
+  const hlId = resultHighlights[currentId];
+  if (hlId) {
+    const el = document.getElementById(hlId);
+    if (el) el.classList.add('highlight');
+  }
+
+  // Tree nav
+  const treeNav = document.getElementById('tree-nav');
+  const navItems = [...history.map(h => h.id), currentId];
+  treeNav.innerHTML = navItems.map((id, i) => {
+    const isCurrent = i === navItems.length - 1;
+    const lbl = stateLabels[id] || id;
+    return `<div class="tree-item ${isCurrent ? 'current' : 'visited'}">
+      <div class="tree-dot"></div>${lbl}</div>`;
+  }).join('');
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Backspace' || e.key === 'ArrowLeft') { goBack(); return; }
+  const n = parseInt(e.key);
+  if (n >= 1 && n <= 4) {
+    const cur = document.querySelector('.state.on');
+    const opts = cur.querySelectorAll('.opt');
+    if (opts[n - 1]) opts[n - 1].click();
+  }
+});
+
+updateUI('q0');
+</script>
+</body>
+</html>
